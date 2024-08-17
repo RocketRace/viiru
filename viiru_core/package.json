@@ -1,0 +1,13 @@
+{
+  "name": "viiru_core",
+  "version": "0.1.0",
+  "main": "index.node",
+  "scripts": {
+    "build": "cargo build --message-format=json --release > cargo.log",
+    "postbuild": "neon dist < cargo.log"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@neon-rs/cli": "0.1.73"
+  }
+}
