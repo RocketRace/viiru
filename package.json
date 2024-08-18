@@ -19,7 +19,11 @@
     "typescript-eslint": "^8.1.0"
   },
   "dependencies": {
+    "@types/jsdom": "^21.1.7",
     "browser-env": "^3.3.0",
+    "decode-html": "^2.0.0",
+    "htmlparser2": "^9.1.0",
+    "jsdom": "^24.1.1",
     "scratch-blocks": "^1.1.206",
     "scratch-storage": "^2.3.213",
     "scratch-vm": "^4.5.422",

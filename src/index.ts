@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// here be any-casts
+
 // looking at the dependencies, we've got
 import fs from 'node:fs';
 // utilities
@@ -7,9 +10,13 @@ import VM from 'scratch-vm';
 // the scratch core VM
 import Storage from 'scratch-storage';
 // serialization for scratch assets
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-require('browser-env')(['window', 'document'])
-import { Workspace } from 'scratch-blocks';
+import { JSDOM } from 'jsdom';
+const jsdom = new JSDOM();
+(global as any).window = jsdom.window;
+global.document = window.document;
+global.DOMParser = window.DOMParser;
+global.XMLSerializer = window.XMLSerializer;
+import SB from 'scratch-blocks';
 // ... uhhhhhhhhh so
 //
 // scratch-blocks contains an UI implementation for the scratch block 
@@ -21,28 +28,47 @@ import { Workspace } from 'scratch-blocks';
 // like, writing-template-xml-strings-in-json kind of a pain -
 // so I'd much rather pull in the dependency
 //
-// problem: it's a whole ass UI designed for the browser, and therefore
+// problem: it's a whole-ass UI designed for the browser, and therefore
 // uses all sorts of browser-only globals just to initialize
-//
-// solution: just pull a whole browser environment into nodejs :)
-// a huge dependency tree never hurt anybody
+// 
+// so that's that I'm doing, dumping browser-only globals into the NodeJS
+// runtime. a huge dependency tree never hurt anybody
 const vm = new VM();
-const workspace = new Workspace()
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const listener = (vm as any).blockListener
-//                           ^ missing from type decl
-workspace.addChangeListener(listener)
-const storage = new Storage();
-vm.attachStorage(storage)
+vm.attachStorage(new Storage())
+// yeah I'm pretending to be a browser. don't worry about it
+const fakeDiv = document.createElement('div');
+document.body.appendChild(fakeDiv);
+fakeDiv.setAttribute('id', 'fakeDiv');
+fakeDiv.setAttribute('style', 'height: 480px; width: 600px;');
+const workspace = (SB as any).inject('fakeDiv', {});
+// one interesting this about the workspace is that it's entirely
+// unsynchronized with the VM. its only purpose is to create
+// block events that I can then pass through to the VM.
 
-const load = async (path: string) => {
+// == interface functions ==
+const loadProject = async (path: string) => {
     const buffer = fs.readFileSync(path);
     await vm.loadProject(buffer);
 }
 
-const save = async (path: string) => {
+const saveProject = async (path: string) => {
     const blob = await vm.saveProjectSb3();
     fs.writeFileSync(path, new Uint8Array(await blob.arrayBuffer()));
+}
+
+// this one is weird because the VM will only accept fully 
+// fledged block data structures (and I don't want to reimplement
+// every single scratch block), but the templates are only implemented
+// by scratch-blocks in its own internal representation format.
+// so I manually call the VM's event listener, pretending to be scratch-blocks
+const createBlock = (opcode: string, id?: string) => {
+    const block = workspace.newBlock(opcode, id);
+    const event = new (SB as any).Events.Create(block);
+    (vm as any).blockListener(event);
+}
+
+const deleteBlock = (id: string) => {
+    (vm.runtime.getEditingTarget()?.blocks as any).deleteBlock(id)
 }
 
 // ???
@@ -55,23 +81,19 @@ const save = async (path: string) => {
 // blocks.getBranch(bid, num): bid?
 
 // what's a race condition when you can just
-const awa = () => new Promise(resolve => setTimeout(resolve, 0));
+// const awa = (it?: number) => new Promise(resolve => setTimeout(resolve, it ?? 0));
 
 const main = async () => {
-    await load("example/cg.sb3");
+    await loadProject("example/cg.sb3");
     vm.start();
     core.main();
-
-    // let id = "";
-    // vm.runtime.allScriptsDo(newId => {id = newId}, vm.runtime.getEditingTarget()!);
-    // console.log(vm.runtime.getEditingTarget()?.blocks.getBlock(id));
 
     // const events = [
     //     {
     //         type: "create",
     //         blockId: "fhui31qedkfjs",
     //         xml: {
-    //             innerHtml: "xml string"
+    //             outerHtml: "xml string (SUCKS, don't like it)"
     //         }
     //     },
     //     {
@@ -96,12 +118,12 @@ const main = async () => {
     //     },
     // ];
 
-    workspace.newBlock("hiya", "foobars");
-    await awa();
+    createBlock('control_forever', 'yippee');
+    console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('yippee'));
+    deleteBlock('yippee');
+    console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('yippee'));
     
-    console.log(vm.runtime.targets.map(target => target.blocks.getBlock("foobars")).find(v => v !== undefined));
-
-    save("example/cg2.sb3");
+    saveProject("example/cg2.sb3");
     vm.quit();
 }
 
