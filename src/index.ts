@@ -45,7 +45,7 @@ const workspace = (SB as any).inject('fakeDiv', {});
 // unsynchronized with the VM. its only purpose is to create
 // block events that I can then pass through to the VM.
 
-// == interface functions ==
+// == editor functions ==
 const loadProject = async (path: string) => {
     const buffer = fs.readFileSync(path);
     await vm.loadProject(buffer);
@@ -56,7 +56,7 @@ const saveProject = async (path: string) => {
     fs.writeFileSync(path, new Uint8Array(await blob.arrayBuffer()));
 }
 
-// this one is weird because the VM will only accept fully 
+// this one is a bit weird because the VM will only accept fully 
 // fledged block data structures (and I don't want to reimplement
 // every single scratch block), but the templates are only implemented
 // by scratch-blocks in its own internal representation format.
@@ -65,10 +65,99 @@ const createBlock = (opcode: string, id?: string) => {
     const block = workspace.newBlock(opcode, id);
     const event = new (SB as any).Events.Create(block);
     (vm as any).blockListener(event);
+    const createdBlock = vm.runtime.getEditingTarget()?.blocks.getBlock(block.id);
+    if (createdBlock) {
+        block.inputList.forEach((input: any) => {
+            if (input.name !== '') {
+                createdBlock.inputs[input.name] = {
+                    name: input.name,
+                    block: null as any,
+                    shadow: null
+                }
+            }
+        });
+    }
 }
 
 const deleteBlock = (id: string) => {
     (vm.runtime.getEditingTarget()?.blocks as any).deleteBlock(id)
+}
+
+// the various moveBlock routines have been split for each usecase
+const slideBlock = (id: string, x: number, y: number) => {
+    (vm.runtime.getEditingTarget()?.blocks as any).moveBlock({
+        id,
+        newCoordinate: {x, y},
+    });
+}
+
+const attachBlock = (id: string, newParent: string, newInput?: string) => {
+    const existingParent = vm.runtime.getEditingTarget()?.blocks.getBlock(newParent)?.next;
+    if (existingParent) {
+        return;
+    }
+    (vm.runtime.getEditingTarget()?.blocks as any).moveBlock({
+        id,
+        newParent,
+        newInput
+    });
+}
+
+const detachBlock = (id: string) => {
+    const oldParent = vm.runtime.getEditingTarget()?.blocks.getBlock(id)?.parent;
+    if (!oldParent) {
+        return;
+    }
+    // first try to unslot it from any input slot
+    const inputs: any = vm.runtime.getEditingTarget()?.blocks.getBlock(oldParent)?.inputs;
+    if (inputs) {
+        for (const oldInput in inputs) {
+            if (Object.prototype.hasOwnProperty.call(inputs, oldInput)) {
+                if (inputs[oldInput].block == id) {
+                    (vm.runtime.getEditingTarget()?.blocks as any).moveBlock({
+                        id,
+                        oldParent,
+                        oldInput,
+                    });
+                    return;
+                }
+            }
+        }
+    }
+    // otherwise, fall back to removing it from its parent
+    (vm.runtime.getEditingTarget()?.blocks as any).moveBlock({
+        id,
+        oldParent,
+    });
+}
+
+// the changeBlock routines were also split apart
+const changeField = (id: string, name: string, value: string) => {
+    // VARIABLE, LIST, or BROADCAST_OPTION, or variably named dropdown inputs
+    (vm.runtime.getEditingTarget()?.blocks as any).changeBlock({
+        id,
+        element: 'field',
+        name,
+        value
+    });
+}
+
+// todo: is this properly implemented?
+const changeMutation = (id: string, value: any) => {
+    (vm.runtime.getEditingTarget()?.blocks as any).changeBlock({
+        id,
+        element: 'mutation',
+        value
+    });
+}
+
+// todo: is this needed? the frontend doesn't care for monitors
+const changeCheckbox = (id: string, value: boolean) => {
+    (vm.runtime.getEditingTarget()?.blocks as any).changeBlock({
+        id,
+        element: 'checkbox',
+        value
+    });
 }
 
 // ???
@@ -87,6 +176,7 @@ const main = async () => {
     await loadProject("example/cg.sb3");
     vm.start();
     core.main();
+    (vm.runtime.getEditingTarget()?.blocks as any).deleteAllBlocks();
 
     // const events = [
     //     {
@@ -118,10 +208,18 @@ const main = async () => {
     //     },
     // ];
 
-    createBlock('control_forever', 'yippee');
-    console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('yippee'));
-    deleteBlock('yippee');
-    console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('yippee'));
+    createBlock('event_whenflagclicked', 'starting');
+    slideBlock('starting', 35, 35);
+    createBlock('control_if', 'if');
+    createBlock('looks_sayforsecs', 'speak');
+    attachBlock('if', 'starting');
+    attachBlock('speak', 'if', 'SUBSTACK');
+    createBlock('operator_equals', 'cond!!');
+    attachBlock('cond!!', 'if', 'CONDITION');
+    console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('starting'));
+    console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('if'));
+    console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('cond!!'));
+    console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('speak'));
     
     saveProject("example/cg2.sb3");
     vm.quit();
