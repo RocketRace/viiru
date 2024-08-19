@@ -163,6 +163,19 @@ const changeCheckbox = (id: string, value: boolean) => {
     });
 }
 
+const API = {
+    loadProject,
+    saveProject,
+    createBlock,
+    deleteBlock,
+    slideBlock,
+    attachBlock,
+    detachBlock,
+    changeField,
+    changeMutation,
+    changeCheckbox,
+}
+
 // ???
 // allScriptsDo(fn, ?target)
 
@@ -178,7 +191,7 @@ const changeCheckbox = (id: string, value: boolean) => {
 const main = async () => {
     await loadProject("example/cg.sb3");
     vm.start();
-    core.main();
+    core.main(API);
     (vm.runtime.getEditingTarget()?.blocks as any).deleteAllBlocks();
 
     // const events = [
