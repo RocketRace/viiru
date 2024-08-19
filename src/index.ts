@@ -3,6 +3,7 @@
 
 // looking at the dependencies, we have
 import fs from 'node:fs';
+import { loopWhile } from 'deasync'
 // utilities
 import core from 'viiru_core';
 // the custom editor logic
@@ -47,15 +48,28 @@ const workspace = (SB as any).inject('fakeDiv', {});
 // this can theoretically cause issues with conflicting IDs...
 // but that's rare enough that I'll ignore it completely.
 
-// == editor functions ==
-const loadProject = async (path: string) => {
-    const buffer = fs.readFileSync(path);
-    await vm.loadProject(buffer);
+// yes, this is ugly, but I do NOT want to deal with callback resolution
+// *across an ABI boundary*
+const resolve = <T>(p: Promise<T>): T | undefined => {
+    let result: T | undefined = undefined;
+    let done = false;
+    p.then(res => result = res).finally(() => done = true);
+    loopWhile(() => !done);
+    return result;
 }
 
-const saveProject = async (path: string) => {
-    const blob = await vm.saveProjectSb3();
-    fs.writeFileSync(path, new Uint8Array(await blob.arrayBuffer()));
+// == editor functions ==
+const loadProject = (path: string) => {
+    const buffer = fs.readFileSync(path);
+    resolve(vm.loadProject(buffer));
+}
+
+const saveProject = (path: string) => {
+    resolve(vm.saveProjectSb3().then(
+        blob => blob.arrayBuffer().then(
+            buffer => fs.writeFileSync(path, new Uint8Array(buffer))
+        )
+    ));
 }
 
 // this one is a bit weird because the VM will only accept fully 
@@ -90,7 +104,7 @@ const deleteBlock = (id: string) => {
 const slideBlock = (id: string, x: number, y: number) => {
     (vm.runtime.getEditingTarget()?.blocks as any).moveBlock({
         id,
-        newCoordinate: {x, y},
+        newCoordinate: { x, y },
     });
 }
 
@@ -185,59 +199,15 @@ const API = {
 // blocks.getNextBlock(): bid?
 // blocks.getBranch(bid, num): bid?
 
-// what's a race condition when you can just
-// const awa = (it?: number) => new Promise(resolve => setTimeout(resolve, it ?? 0));
-
 const main = async () => {
-    await loadProject("example/cg.sb3");
     vm.start();
     core.main(API);
-    (vm.runtime.getEditingTarget()?.blocks as any).deleteAllBlocks();
 
-    // const events = [
-    //     {
-    //         type: "create",
-    //         blockId: "fhui31qedkfjs",
-    //         xml: {
-    //             outerHtml: "xml string (SUCKS, don't like it)"
-    //         }
-    //     },
-    //     {
-    //         type: "change",
-    //         blockId: "blockId",
-    //         element: "field | comment | collapsed | disabled | inline | mutation",
-    //         name: "field name if element == field",
-    //         newValue: "newValue",
-    //     },
-    //     {
-    //         type: "move",
-    //         blockId: "blockId",
-    //         oldParentId: "oldParentId",
-    //         oldInputName: "oldInputName",
-    //         newParentId: "newParentId",
-    //         newInputName: "newInputName",
-    //         newCoordinate: "newCoordinate",
-    //     },
-    //     {
-    //         type: "delete",
-    //         blockId: "blockId",
-    //     },
-    // ];
-
-    createBlock('event_whenflagclicked', 'starting');
-    slideBlock('starting', 35, 35);
-    createBlock('control_if', 'if');
-    createBlock('looks_sayforsecs', 'speak');
-    attachBlock('if', 'starting');
-    attachBlock('speak', 'if', 'SUBSTACK');
-    createBlock('operator_equals', 'cond!!');
-    attachBlock('cond!!', 'if', 'CONDITION');
     console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('starting'));
     console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('if'));
     console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('cond!!'));
     console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('speak'));
-    
-    saveProject("example/cg2.sb3");
+
     vm.quit();
 }
 
