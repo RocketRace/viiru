@@ -1,5 +1,3 @@
-use std::{thread, time::Duration};
-
 use neon::{prelude::*, types::function::Arguments};
 
 #[neon::main]
@@ -117,17 +115,24 @@ fn detach_block<'a>(
     api_call(cx, api, "detachBlock", args)
 }
 
-enum EditorOp {
-    LoadProject(String),
-    SaveProject(String),
-    CreateBlock((), Option<String>),
-    DeleteBlock(String),
-    SlideBlock(String, i32, i32),
-    AttachBlock(String, String, Option<String>),
-    DetachBlock(String),
-    ChangeField(String, String, String),
-    ChangeMutation(String, ()),
-    ChangeCheckbox(String, bool),
+// todo: ChangeField(String, String, String),
+// todo: ChangeMutation(String, ()),
+// todo: ChangeCheckbox(String, bool),
+
+fn get_block<'a>(
+    cx: &mut FunctionContext<'a>,
+    api: Handle<JsObject>,
+    id: &str,
+) -> JsResult<'a, JsValue> {
+    let args = args!(cx; cx.string(id));
+    api_call(cx, api, "getBlock", args)
+}
+
+fn get_scripts<'a>(
+    cx: &mut FunctionContext<'a>,
+    api: Handle<JsObject>,
+) -> JsResult<'a, JsArray> {
+    api_call(cx, api, "getBlock", ())
 }
 
 fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
@@ -142,8 +147,12 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     attach_block(&mut cx, api, "speak", "if", Some("SUBSTACK"))?;
     create_block(&mut cx, api, "operator_equals", Some("cond!!"))?;
     attach_block(&mut cx, api, "cond!!", "if", Some("CONDITION"))?;
+    // accessing objects kind of sucks
+    // if only there was some kind of serialization-deserialization library that could help...
+    let b: Handle<JsObject> = get_block(&mut cx, api, "if")?.downcast_or_throw(&mut cx)?;
+    let parent: Handle<JsString> = b.get(&mut cx, "parent")?;
+    dbg!(parent.value(&mut cx));
     save_project(&mut cx, api, "example/cg2.sb3")?;
-
 
     Ok(cx.undefined())
 }

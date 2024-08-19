@@ -97,7 +97,7 @@ const createBlock = (opcode: string, id?: string) => {
 }
 
 const deleteBlock = (id: string) => {
-    (vm.runtime.getEditingTarget()?.blocks as any).deleteBlock(id)
+    (vm.runtime.getEditingTarget()?.blocks as any).deleteBlock(id);
 }
 
 // the various moveBlock routines have been split for each usecase
@@ -177,6 +177,14 @@ const changeCheckbox = (id: string, value: boolean) => {
     });
 }
 
+const getBlock = (id: string): object | null => {
+    return vm.runtime.getEditingTarget()?.blocks.getBlock(id) ?? null
+}
+
+const getScripts = (): string[] => {
+    return (vm.runtime.getEditingTarget()?.blocks as any).getScripts() ?? []
+}
+
 const API = {
     loadProject,
     saveProject,
@@ -188,26 +196,13 @@ const API = {
     changeField,
     changeMutation,
     changeCheckbox,
+    getBlock,
+    getScripts,
 }
-
-// ???
-// allScriptsDo(fn, ?target)
-
-// == a bunch of useful getters ==
-// blocks.getBlock(bid): ?block
-// blocks.getScripts(): [bid]
-// blocks.getNextBlock(): bid?
-// blocks.getBranch(bid, num): bid?
 
 const main = async () => {
     vm.start();
     core.main(API);
-
-    console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('starting'));
-    console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('if'));
-    console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('cond!!'));
-    console.log(vm.runtime.getEditingTarget()?.blocks.getBlock('speak'));
-
     vm.quit();
 }
 
