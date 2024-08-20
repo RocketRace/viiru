@@ -2,6 +2,8 @@ mod api;
 mod blocks;
 mod spec;
 
+use std::sync::LazyLock;
+
 use neon::prelude::*;
 use api::*;
 
@@ -13,7 +15,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
 
 fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let api = cx.argument::<JsObject>(0)?;
-    let spec = &blocks::BLOCKS["event_whenflagclicked"];
+    dbg!(LazyLock::force(&blocks::BLOCKS));
 
     load_project(&mut cx, api, "example/cg.sb3")?;
     create_block(&mut cx, api, "event_whenflagclicked", Some("starting"))?;

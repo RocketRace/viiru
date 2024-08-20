@@ -10,3 +10,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 neon = "1"
+pom = "3.4.0"
