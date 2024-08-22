@@ -3,7 +3,7 @@
 
 // looking at the dependencies, we have
 import fs from 'node:fs';
-import { loopWhile } from 'deasync'
+import { loopWhile } from 'deasync';
 // utilities
 import core from 'viiru_core';
 // the custom editor logic
@@ -17,7 +17,9 @@ const jsdom = new JSDOM();
 global.document = window.document;
 global.DOMParser = window.DOMParser;
 global.XMLSerializer = window.XMLSerializer;
+global.MouseEvent = window.MouseEvent;
 import SB from 'scratch-blocks';
+// const makeToolboxXML = require("./vendored/make-toolbox-xml");
 // ... uhhhhhhhhh so
 //
 // scratch-blocks contains an UI implementation for the scratch block 
@@ -78,25 +80,16 @@ const saveProject = (path: string) => {
 // by scratch-blocks in its own internal representation format.
 // so I manually call the VM's event listener, pretending to be scratch-blocks,
 // post-initializing the block with some extra data.
-const createBlock = (opcode: string, id?: string) => {
+const createBlock = (opcode: string, isShadow: boolean, id?: string) => {
     const block = workspace.newBlock(opcode, id);
-    const event = new (SB as any).Events.Create(block);
+    if (isShadow) {
+        // blocks behave goofy otherwise
+        block.setShadow(true);
+    }
+    const event = new (SB as any).Events.BlockCreate(block);
     (vm as any).blockListener(event);
-    const createdBlock = vm.runtime.getEditingTarget()?.blocks.getBlock(block.id);
-    const a = [opcode];
-    if (createdBlock) {
-        block.inputList.forEach((input: any) => {
-            input.fieldRow.forEach((row: any) => {
-                if (row.name) {
-                    a.push(row.name)
-                    a.push(row.menuGenerator_)
-                }
-            })
-        });
-    }
-    if (a.length !== 1) {
-        console.log(...a);
-    }
+    vm.runtime.getEditingTarget()?.blocks.getBlock(block.id);
+    return block.id;
 }
 
 const deleteBlock = (id: string) => {

@@ -17,24 +17,20 @@ pub enum Fragment {
     StrumberInput(String, Option<DefaultValue>),
     BooleanInput(String),
     BlockInput(String),
+    Dropdown(String),
     Expander,
-    Special(Special),
-}
-#[derive(Debug, Clone)]
-pub enum Special {
     Flag,
     Clockwise,
     Anticlockwise,
-    ColorPicker(String),
     CustomBlock(Vec<()>),
 }
 
 #[derive(Debug, Clone)]
 pub enum DefaultValue {
-    Id(String),
+    Block(String),
     Str(String),
     Num(f64),
-    Color(u8, u8, u8),
+    Color(String /* #RRGGBB */),
 }
 
 /// panics on invalid input so be careful
@@ -76,25 +72,26 @@ fn number() -> Parser<u8, f64> {
 }
 
 fn special() -> Parser<u8, Fragment> {
-      seq(b"$FLAG").map(|_| Fragment::Special(Special::Flag))
-    | seq(b"$CLOCKWISE").map(|_| Fragment::Special(Special::Clockwise))
-    | seq(b"$ANTICLOCKWISE").map(|_| Fragment::Special(Special::Anticlockwise))
+      seq(b"$FLAG").map(|_| Fragment::Flag)
+    | seq(b"$CLOCKWISE").map(|_| Fragment::Clockwise)
+    | seq(b"$ANTICLOCKWISE").map(|_| Fragment::Anticlockwise)
     | sym(b'<').map(|_| Fragment::Text("<".into()))
     | sym(b'(').map(|_| Fragment::Text("(".into()))
     | sym(b'[').map(|_| Fragment::Text("[".into()))
     | sym(b'{').map(|_| Fragment::Text("{".into()))
-    | id().map(|s| Fragment::Special(Special::ColorPicker(s)))
+    | id().map(Fragment::Dropdown)
 }
 
 fn default_value() -> Parser<u8, DefaultValue> {
     sym(b'=') * (
           string().map(DefaultValue::Str)
         | number().map(DefaultValue::Num)
-        | id().map(DefaultValue::Id)
-        | (sym(b'#') * is_a(hex_digit).repeat(6)).map(|digits| {
+        | id().map(DefaultValue::Block)
+        | (sym(b'#') * is_a(hex_digit).repeat(6)).map(|mut digits| {
             // unnecessary but whatever
-            let s = u32::from_str_radix(&String::from_utf8(digits).unwrap(), 16).unwrap();
-            DefaultValue::Color((s >> 16) as u8, (s >> 8) as u8, s as u8)
+            digits.insert(0, b'#');
+            let s = String::from_utf8(digits).unwrap();
+            DefaultValue::Color(s)
         })
     )
 }

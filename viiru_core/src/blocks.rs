@@ -55,14 +55,14 @@ pub static BLOCKS: LazyLock<HashMap<&'static str, Spec>> = LazyLock::new(|| {
         ("event_whenflagclicked",         spec("when [$FLAG] clicked")),//
         ("event_whenkeypressed",          spec("when[KEY_OPTION]key pressed")),//
         ("event_whenthisspriteclicked",   spec("when this sprite clicked")),//
-        // ("event_whenstageclicked",        spec("when stage clicked")),//
+        ("event_whenstageclicked",        spec("when stage clicked")),//
         ("event_whenbackdropswitchesto",  spec("when backdrop switches to[BACKDROP]")),//
         ("event_whengreaterthan",         spec("when[WHENGREATERTHANMENU]>(VALUE=10.0)")),// VALUE
         ("event_whenbroadcastreceived",   spec("when I receive[BROADCAST_OPTION]")),//
         ("event_broadcast",               spec("broadcast(BROADCAST_INPUT=event_broadcast_menu)")),// BROADCAST_INPUT
         ("event_broadcastandwait",        spec("broadcast(BROADCAST_INPUT=event_broadcast_menu)and wait")),// BROADCAST_INPUT
         ("control_wait",                  spec("wait(DURATION=1.0)seconds")),// DURATION
-        ("control_repeat",                spec("repeat(TIMES)\n{SUBSTACK}\n\t")),// TIMES SUBSTACK
+        ("control_repeat",                spec("repeat(TIMES=10.0)\n{SUBSTACK}\n\t")),// TIMES SUBSTACK
         ("control_forever",               spec("forever\n{SUBSTACK}\n\t")),// SUBSTACK
         ("control_if",                    spec("if<CONDITION>then\n{SUBSTACK}\n\t")),// CONDITION SUBSTACK
         ("control_if_else",               spec("if<CONDITION>then\n{SUBSTACK}\nelse\n{SUBSTACK2}\n\t")),// CONDITION SUBSTACK SUBSTACK2
@@ -266,17 +266,17 @@ pub const OPCODES: &[&str] = &[
     // "procedures_prototype", // extra fields
     // "argument_reporter_string_number", // extra fields
     // "argument_reporter_boolean", // extra fields
-    "motion_goto_menu",
-    "motion_glideto_menu",
-    "motion_pointtowards_menu",
-    "looks_costume",
-    "looks_backdrops",
-    "sound_sounds_menu",
-    "event_broadcast_menu",
-    "control_create_clone_of_menu",
-    "sensing_touchingobjectmenu",
-    "sensing_distancetomenu",
-    "sensing_keyoptions",
-    "sensing_of_object_menu",
+    // "motion_goto_menu",
+    // "motion_glideto_menu",
+    // "motion_pointtowards_menu",
+    // "looks_costume",
+    // "looks_backdrops",
+    // "sound_sounds_menu",
+    // "event_broadcast_menu",
+    // "control_create_clone_of_menu",
+    // "sensing_touchingobjectmenu",
+    // "sensing_distancetomenu",
+    // "sensing_keyoptions",
+    // "sensing_of_object_menu",
 ];
 

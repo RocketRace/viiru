@@ -27,6 +27,7 @@
     "htmlparser2": "^9.1.0",
     "jsdom": "^24.1.1",
     "scratch-blocks": "^1.1.206",
+    "scratch-gui": "^4.0.10",
     "scratch-storage": "^2.3.213",
     "scratch-vm": "^4.5.422",
     "ts-node": "^10.9.2"

@@ -1,5 +1,11 @@
 use neon::{prelude::*, types::function::Arguments};
 
+use crate::blocks::BLOCKS;
+
+fn string_of(cx: &mut FunctionContext, s: Handle<JsString>) -> String {
+    String::from_utf16(&s.to_utf16(cx)).unwrap()
+}
+
 // neon seems to be a pretty barebones library with not a lot of sugar.
 // but it's too late to change now
 // oh wait I just noticed there's a serde feature. oh well too late now
@@ -47,18 +53,62 @@ pub fn save_project<'a>(
     Ok(result)
 }
 
+// Returns the block ID on success.
 pub fn create_block<'a>(
     cx: &mut FunctionContext<'a>,
     api: Handle<JsObject>,
     opcode: &str,
+    is_shadow: bool,
     id: Option<&str>,
-) -> JsResult<'a, JsUndefined> {
+) -> JsResult<'a, JsString> {
     let args = id.map_or(
         // this is one way to do it, comment "uwu" if you prefer this one
-        args!(cx; cx.string(opcode), cx.undefined()),
-        |id| args!(cx; cx.string(opcode), cx.string(id)),
+        args!(cx; cx.string(opcode), cx.boolean(is_shadow), cx.undefined()),
+        |id| args!(cx; cx.string(opcode), cx.boolean(is_shadow), cx.string(id)),
     );
     api_call(cx, api, "createBlock", args)
+}
+
+// special
+pub fn create_block_template<'a>(
+    cx: &mut FunctionContext<'a>,
+    api: Handle<JsObject>,
+    opcode: &str,
+    id: Option<&str>,
+) -> JsResult<'a, JsString> {
+    let id_handle = create_block(cx, api, opcode, false, id)?;
+    let id = string_of(cx, id_handle);
+    let spec = &BLOCKS[opcode];
+    for frag in &spec.head {
+        if let crate::spec::Fragment::StrumberInput(value, Some(default)) = frag { 
+            let child_id = match default {
+                crate::spec::DefaultValue::Block(child_opcode) => {
+                    let id_handle = create_block(cx, api, child_opcode, true, None)?;
+                    string_of(cx, id_handle)
+                },
+                crate::spec::DefaultValue::Str(s) => {
+                    let id_handle = create_block(cx, api, "text", true, None)?;
+                    let id = string_of(cx, id_handle);
+                    change_field(cx, api, &id, "TEXT", s)?;
+                    id
+                },
+                crate::spec::DefaultValue::Num(n) => {
+                    let id_handle = create_block(cx, api, "math_number", true, None)?;
+                    let id = string_of(cx, id_handle);
+                    change_field(cx, api, &id, "NUM", &n.to_string())?;
+                    id
+                },
+                crate::spec::DefaultValue::Color(rgb) => {
+                    let id_handle = create_block(cx, api, "colour_picker", true, None)?;
+                    let id = string_of(cx, id_handle);
+                    change_field(cx, api, &id, "COLOUR", rgb)?;
+                    id
+                },
+            };
+            attach_block(cx, api, &child_id, &id, Some(value))?;
+        }
+    }
+    Ok(id_handle)
 }
 
 pub fn delete_block<'a>(
@@ -109,7 +159,17 @@ pub fn detach_block<'a>(
     api_call(cx, api, "detachBlock", args)
 }
 
-// todo: ChangeField(String, String, String),
+pub fn change_field<'a>(
+    cx: &mut FunctionContext<'a>,
+    api: Handle<JsObject>,
+    id: &str,
+    field: &str,
+    value: &str
+) -> JsResult<'a, JsUndefined> {
+    let args = args!(cx; cx.string(id), cx.string(field), cx.string(value));
+    api_call(cx, api, "changeField", args)
+}
+
 // todo: ChangeMutation(String, ()),
 // todo: ChangeCheckbox(String, bool),
 
@@ -126,5 +186,5 @@ pub fn get_scripts<'a>(
     cx: &mut FunctionContext<'a>,
     api: Handle<JsObject>,
 ) -> JsResult<'a, JsArray> {
-    api_call(cx, api, "getBlock", ())
+    api_call(cx, api, "getScripts", ())
 }
