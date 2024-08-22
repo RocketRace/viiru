@@ -83,16 +83,19 @@ const createBlock = (opcode: string, id?: string) => {
     const event = new (SB as any).Events.Create(block);
     (vm as any).blockListener(event);
     const createdBlock = vm.runtime.getEditingTarget()?.blocks.getBlock(block.id);
+    const a = [opcode];
     if (createdBlock) {
         block.inputList.forEach((input: any) => {
-            if (input.name !== '') {
-                createdBlock.inputs[input.name] = {
-                    name: input.name,
-                    block: null as any,
-                    shadow: null
+            input.fieldRow.forEach((row: any) => {
+                if (row.name) {
+                    a.push(row.name)
+                    a.push(row.menuGenerator_)
                 }
-            }
+            })
         });
+    }
+    if (a.length !== 1) {
+        console.log(...a);
     }
 }
 
