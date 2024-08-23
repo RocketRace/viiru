@@ -4,20 +4,17 @@ mod result;
 mod spec;
 mod ui;
 
-use std::{io::stdout, thread, time::Duration};
+use std::io::stdout;
 
 use api::*;
 use crossterm::{
-    cursor::MoveTo,
     event::{read, KeyCode, KeyEventKind},
     execute,
-    style::Print,
     terminal::{window_size, Clear, ClearType, WindowSize},
-    ExecutableCommand,
 };
 use neon::prelude::*;
 use result::return_or_throw;
-use ui::in_terminal_scope;
+use ui::{in_terminal_scope, print_size};
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
@@ -31,12 +28,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let result = in_terminal_scope(|| {
         load_project(&mut cx, api, "example/empty.sb3")?;
 
-        let WindowSize {
-            mut columns,
-            mut rows,
-            ..
-        } = window_size()?;
-        execute!(stdout(), Clear(ClearType::All), MoveTo(0, 0))?;
+        execute!(stdout(), Clear(ClearType::All))?;
 
         for (i, opcode) in blocks::OPCODES.iter().enumerate() {
             let id = i.to_string();
@@ -44,6 +36,14 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             slide_block(&mut cx, api, &id, 100.0, (i as f64) * 100.0)?;
         }
         save_project(&mut cx, api, "example/output.sb3")?;
+
+        let WindowSize {
+            mut columns,
+            mut rows,
+            ..
+        } = window_size()?;
+
+        print_size(columns, rows)?;
 
         loop {
             match read()? {
@@ -55,13 +55,12 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                 crossterm::event::Event::Resize(w, h) => {
                     columns = w;
                     rows = h;
+                    print_size(columns, rows)?;
                 }
                 _ => (),
             }
         }
 
-        stdout().execute(Print(format!("hi there, {columns}x{rows} terminal!")))?;
-        thread::sleep(Duration::from_secs(2));
         Ok(())
     });
 

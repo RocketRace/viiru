@@ -1,8 +1,13 @@
 use std::io::stdout;
 
 use crossterm::{
-    cursor::{Hide, Show},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    cursor::{Hide, MoveTo, Show},
+    execute,
+    style::Print,
+    terminal::{
+        disable_raw_mode, enable_raw_mode, Clear, ClearType, EnterAlternateScreen,
+        LeaveAlternateScreen,
+    },
     ExecutableCommand,
 };
 
@@ -17,5 +22,15 @@ where
     f()?;
     disable_raw_mode()?;
     stdout().execute(LeaveAlternateScreen)?.execute(Show)?;
+    Ok(())
+}
+
+pub fn print_size(columns: u16, rows: u16) -> ViiruResult {
+    execute!(
+        stdout(),
+        Clear(ClearType::All),
+        MoveTo(0, 0),
+        Print(format!("hi there, {columns}x{rows} terminal!"))
+    )?;
     Ok(())
 }
