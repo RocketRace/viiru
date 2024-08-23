@@ -1,22 +1,24 @@
 use std::io::stdout;
 
 use crossterm::{
-    execute,
     terminal::{
         disable_raw_mode, enable_raw_mode, window_size, EnterAlternateScreen, LeaveAlternateScreen,
         WindowSize,
     },
+    ExecutableCommand,
 };
-use neon::prelude::*;
 
-pub fn in_terminal_scope<'a, F>(f: F)
+use crate::result::ViiruResult;
+
+pub fn in_terminal_scope<F>(f: F) -> ViiruResult
 where
-    F: FnOnce(u16, u16) -> JsResult<'a, JsUndefined>,
+    F: FnOnce(u16, u16) -> ViiruResult,
 {
-    execute!(stdout(), EnterAlternateScreen).unwrap();
-    enable_raw_mode().unwrap();
-    let WindowSize { columns, rows, .. } = window_size().unwrap();
-    f(columns, rows).unwrap();
-    disable_raw_mode().unwrap();
-    execute!(stdout(), LeaveAlternateScreen).unwrap();
+    stdout().execute(EnterAlternateScreen)?;
+    enable_raw_mode()?;
+    let WindowSize { columns, rows, .. } = window_size()?;
+    f(columns, rows)?;
+    disable_raw_mode()?;
+    stdout().execute(LeaveAlternateScreen)?;
+    Ok(())
 }

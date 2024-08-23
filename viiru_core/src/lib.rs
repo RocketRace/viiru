@@ -1,12 +1,17 @@
 mod api;
 mod blocks;
+mod result;
 mod spec;
 mod ui;
 
-use std::{thread, time::Duration};
+use std::{io::{stdout, Write}, thread, time::Duration};
 
-use neon::prelude::*;
 use api::*;
+use crossterm::{
+    cursor::{Hide, MoveTo}, queue, style::Print, terminal::{Clear, ClearType},
+};
+use neon::prelude::*;
+use result::ViiruError;
 use ui::in_terminal_scope;
 
 #[neon::main]
@@ -18,8 +23,12 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
 fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let api = cx.argument::<JsObject>(0)?;
 
-    in_terminal_scope(|w, h| {
+    let result = in_terminal_scope(|w, h| {
         load_project(&mut cx, api, "example/empty.sb3")?;
+
+        queue!(stdout(), Clear(ClearType::All), Hide, MoveTo(0, 0), Print("hi there!"))?;
+        stdout().flush()?;
+
         for (i, opcode) in blocks::OPCODES.iter().enumerate() {
             let id = i.to_string();
             create_block_template(&mut cx, api, opcode, Some(&id))?;
@@ -27,9 +36,14 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         }
         save_project(&mut cx, api, "example/output.sb3")?;
         thread::sleep(Duration::from_millis(5000));
-        Ok(cx.undefined())
+        Ok(())
     });
 
-
-    Ok(cx.undefined())
+    match result {
+        Ok(()) => Ok(cx.undefined()),
+        Err(ViiruError::JsThrow(throw)) => Err(throw),
+        Err(ViiruError::IoError(err)) => {
+            cx.throw_error(err.to_string())
+        }
+    }
 }
