@@ -3,12 +3,13 @@ mod block;
 mod blocks;
 mod result;
 mod spec;
+mod state;
 mod ui;
 
 use std::{collections::HashMap, io::stdout};
 
 use api::*;
-use block::{Block, Colour, Expression, Kind, Throption};
+use block::{Block, Throption};
 use crossterm::{
     event::{read, KeyCode, KeyEventKind},
     execute,
@@ -49,12 +50,11 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
         let block = Block {
             id: "123".into(),
-            colour: Colour(255, 128, 0),
             opcode: "motion_xposition".into(),
             parent_id: Throption::Void,
+            next_id: Throption::Void,
             input_ids: vec![],
             fields: HashMap::new(),
-            kind: Kind::Expression(Expression { shadow: false }),
         };
 
         draw_block(&block, 5, 6)?;

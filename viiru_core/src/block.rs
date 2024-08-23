@@ -1,26 +1,23 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, default};
 
 use crate::blocks::BLOCKS;
 
-pub enum Kind {
-    Expression(Expression),
-    Stack(Stack),
-}
-
+#[derive(Default)]
 pub enum Throption<T> {
-    Given(T),
-    Missing,
+    #[default]
     Void,
+    Missing,
+    Given(T),
 }
 
+#[derive(Default)]
 pub struct Block {
     pub id: String,
-    pub colour: Colour,
     pub opcode: String,
     pub parent_id: Throption<String>,
-    pub input_ids: Vec<Option<String>>,
+    pub next_id: Throption<String>,
+    pub input_ids: Vec<(Option<String>, Option<String>)>,
     pub fields: HashMap<String, String>,
-    pub kind: Kind,
 }
 
 impl Block {
@@ -30,14 +27,3 @@ impl Block {
         todo!()
     }
 }
-
-pub struct Expression {
-    pub shadow: bool,
-}
-
-pub struct Stack {
-    pub is_hat: bool,
-    pub next_id: Throption<String>,
-}
-
-pub struct Colour(pub u8, pub u8, pub u8);

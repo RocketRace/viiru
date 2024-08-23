@@ -145,6 +145,7 @@ const detachBlock = (id: string) => {
 }
 
 // the changeBlock routines were also split apart
+// TODO: value is an object { id?: string, name: string, value: string, variableType?: string }
 const changeField = (id: string, name: string, value: string) => {
     // VARIABLE, LIST, or BROADCAST_OPTION, or variably named dropdown inputs
     (vm.runtime.getEditingTarget()?.blocks as any).changeBlock({
