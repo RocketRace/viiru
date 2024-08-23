@@ -1,20 +1,22 @@
 mod api;
+mod block;
 mod blocks;
 mod result;
 mod spec;
 mod ui;
 
-use std::io::stdout;
+use std::{collections::HashMap, io::stdout};
 
 use api::*;
+use block::{Block, Colour, Expression, Kind, Throption};
 use crossterm::{
     event::{read, KeyCode, KeyEventKind},
     execute,
     terminal::{window_size, Clear, ClearType, WindowSize},
 };
 use neon::prelude::*;
-use result::return_or_throw;
-use ui::{in_terminal_scope, print_size};
+use result::undefined_or_throw;
+use ui::{draw_block, in_terminal_scope, print_size};
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
@@ -45,6 +47,18 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
         print_size(columns, rows)?;
 
+        let block = Block {
+            id: "123".into(),
+            colour: Colour(255, 128, 0),
+            opcode: "motion_xposition".into(),
+            parent_id: Throption::Void,
+            input_ids: vec![],
+            fields: HashMap::new(),
+            kind: Kind::Expression(Expression { shadow: false }),
+        };
+
+        draw_block(&block, 5, 6)?;
+
         loop {
             match read()? {
                 crossterm::event::Event::Key(event) => {
@@ -64,5 +78,5 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         Ok(())
     });
 
-    return_or_throw(&mut cx, result)
+    undefined_or_throw(&mut cx, result)
 }

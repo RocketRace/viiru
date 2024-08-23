@@ -4,9 +4,18 @@ use pom::{
     Parser,
 };
 
+#[derive(Debug)]
+pub enum Shape {
+    Circle,
+    Hexagon,
+    Stack,
+}
 
 #[derive(Debug)]
 pub struct Spec {
+    pub shape: Shape,
+    pub shadow: bool,
+    pub color: String, /* RRGGBB */
     pub head: Vec<Fragment>,
     pub mouths: Vec<(String, Vec<Fragment>)>,
 }
@@ -22,6 +31,10 @@ pub enum Fragment {
     Flag,
     Clockwise,
     Anticlockwise,
+    FieldText(String),
+    VariableName(String),
+    ListName(String),
+    CustomColour(String),
     CustomBlock(Vec<()>),
 }
 
@@ -35,17 +48,39 @@ pub enum DefaultValue {
 
 /// panics on invalid input so be careful
 pub fn spec(s: &'static str) -> Spec {
-    let lines: Vec<_> = s.lines().map(|l| parse_line().parse(l.as_bytes()).unwrap()).collect();
+    let header = &s[..8];
+    let shape = match s.as_bytes()[0] {
+        b'<' => Shape::Hexagon,
+        b'(' => Shape::Circle,
+        b'{' => Shape::Stack,
+        _ => panic!(),
+    };
+    let shadow = s.as_bytes()[7] == b'!';
+    let color = header[1..7].to_string();
+
+    let s = &s[8..];
+    let lines: Vec<_> = s
+        .lines()
+        .map(|l| parse_line().parse(l.as_bytes()).unwrap())
+        .collect();
     let head = lines[0].clone();
 
     let mut mouths = vec![];
     if lines.len() > 1 {
         for mouth in lines[1..].chunks(2) {
-            let Fragment::BlockInput(id) = &mouth[0][0] else { panic!() };
+            let Fragment::BlockInput(id) = &mouth[0][0] else {
+                panic!()
+            };
             mouths.push((id.clone(), mouth[1].clone()))
         }
     }
-    Spec { head, mouths }
+    Spec {
+        shape,
+        shadow,
+        color,
+        head,
+        mouths,
+    }
 }
 
 fn id() -> Parser<u8, String> {
@@ -55,55 +90,63 @@ fn id() -> Parser<u8, String> {
 }
 
 fn string() -> Parser<u8, String> {
-    (sym(b'"') * none_of(b"\"").repeat(0..) - sym(b'"'))
-        .map(|s| String::from_utf8(s).unwrap())
+    (sym(b'"') * none_of(b"\"").repeat(0..) - sym(b'"')).map(|s| String::from_utf8(s).unwrap())
 }
 
 fn number() -> Parser<u8, f64> {
-    (sym(b'-').opt() + is_a(digit).repeat(1..) - sym(b'.') + is_a(digit).repeat(1..))
-        .map(|((negative, mut big), mut small)| {
+    (sym(b'-').opt() + is_a(digit).repeat(1..) - sym(b'.') + is_a(digit).repeat(1..)).map(
+        |((negative, mut big), mut small)| {
             // definitely suboptimal
             big.push(b'.');
             big.append(&mut small);
             let s = String::from_utf8(big).unwrap();
             let pos: f64 = s.parse().unwrap();
-            if negative.is_some() { -pos } else { pos }
-        })
-}
-
-fn special() -> Parser<u8, Fragment> {
-      seq(b"$FLAG").map(|_| Fragment::Flag)
-    | seq(b"$CLOCKWISE").map(|_| Fragment::Clockwise)
-    | seq(b"$ANTICLOCKWISE").map(|_| Fragment::Anticlockwise)
-    | sym(b'<').map(|_| Fragment::Text("<".into()))
-    | sym(b'(').map(|_| Fragment::Text("(".into()))
-    | sym(b'[').map(|_| Fragment::Text("[".into()))
-    | sym(b'{').map(|_| Fragment::Text("{".into()))
-    | id().map(Fragment::Dropdown)
-}
-
-fn default_value() -> Parser<u8, DefaultValue> {
-    sym(b'=') * (
-          string().map(DefaultValue::Str)
-        | number().map(DefaultValue::Num)
-        | id().map(DefaultValue::Block)
-        | (sym(b'#') * is_a(hex_digit).repeat(6)).map(|mut digits| {
-            // unnecessary but whatever
-            digits.insert(0, b'#');
-            let s = String::from_utf8(digits).unwrap();
-            DefaultValue::Color(s)
-        })
+            if negative.is_some() {
+                -pos
+            } else {
+                pos
+            }
+        },
     )
 }
 
+fn special() -> Parser<u8, Fragment> {
+    seq(b"$FLAG").map(|_| Fragment::Flag)
+        | seq(b"$CLOCKWISE").map(|_| Fragment::Clockwise)
+        | seq(b"$ANTICLOCKWISE").map(|_| Fragment::Anticlockwise)
+        | sym(b'<').map(|_| Fragment::Text("<".into()))
+        | sym(b'(').map(|_| Fragment::Text("(".into()))
+        | sym(b'[').map(|_| Fragment::Text("[".into()))
+        | sym(b'{').map(|_| Fragment::Text("{".into()))
+        | id().map(Fragment::Dropdown)
+        | (sym(b'=') * id()).map(Fragment::VariableName)
+        | (sym(b'*') * id()).map(Fragment::ListName)
+        | (sym(b'@') * id()).map(Fragment::FieldText)
+        | (sym(b'#') * id()).map(Fragment::CustomColour)
+}
+
+fn default_value() -> Parser<u8, DefaultValue> {
+    sym(b'=')
+        * (string().map(DefaultValue::Str)
+            | number().map(DefaultValue::Num)
+            | id().map(DefaultValue::Block)
+            | (sym(b'#') * is_a(hex_digit).repeat(6)).map(|mut digits| {
+                // unnecessary but whatever
+                digits.insert(0, b'#');
+                let s = String::from_utf8(digits).unwrap();
+                DefaultValue::Color(s)
+            }))
+}
+
 fn parse_line() -> Parser<u8, Vec<Fragment>> {
-    (
-        (sym(b'(') * id() + default_value().opt() - sym(b')'))
-            .map(|(s, def)| Fragment::StrumberInput(s, def))
+    ((sym(b'(') * id() + default_value().opt() - sym(b')'))
+        .map(|(s, def)| Fragment::StrumberInput(s, def))
         | (sym(b'<') * id() - sym(b'>')).map(Fragment::BooleanInput)
         | (sym(b'{') * id() - sym(b'}')).map(Fragment::BlockInput)
         | (sym(b'[') * special() - sym(b']'))
         | sym(b'\t').map(|_| Fragment::Expander)
-        | none_of(b"(<{[").repeat(1..).map(|s| Fragment::Text(String::from_utf8(s).unwrap()))
-    ).repeat(1..)
+        | none_of(b"(<{[")
+            .repeat(1..)
+            .map(|s| Fragment::Text(String::from_utf8(s).unwrap())))
+    .repeat(1..)
 }

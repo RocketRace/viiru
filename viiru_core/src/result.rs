@@ -2,7 +2,7 @@ use std::io;
 
 use neon::{prelude::*, result::Throw};
 
-pub type ViiruResult = Result<(), ViiruError>;
+pub type ViiruResult<T = ()> = Result<T, ViiruError>;
 
 #[derive(Debug)]
 pub enum ViiruError {
@@ -22,12 +22,12 @@ impl From<io::Error> for ViiruError {
     }
 }
 
-pub fn return_or_throw<'a>(
+pub fn undefined_or_throw<'a, T>(
     cx: &mut FunctionContext<'a>,
-    result: ViiruResult,
+    result: ViiruResult<T>,
 ) -> JsResult<'a, JsUndefined> {
     match result {
-        Ok(()) => Ok(cx.undefined()),
+        Ok(_t) => Ok(cx.undefined()),
         Err(ViiruError::JsThrow(throw)) => Err(throw),
         Err(ViiruError::IoError(err)) => cx.throw_error(err.to_string()),
     }
