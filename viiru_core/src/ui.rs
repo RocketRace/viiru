@@ -1,10 +1,8 @@
 use std::io::stdout;
 
 use crossterm::{
-    terminal::{
-        disable_raw_mode, enable_raw_mode, window_size, EnterAlternateScreen, LeaveAlternateScreen,
-        WindowSize,
-    },
+    cursor::{Hide, Show},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 
@@ -12,13 +10,12 @@ use crate::result::ViiruResult;
 
 pub fn in_terminal_scope<F>(f: F) -> ViiruResult
 where
-    F: FnOnce(u16, u16) -> ViiruResult,
+    F: FnOnce() -> ViiruResult,
 {
-    stdout().execute(EnterAlternateScreen)?;
+    stdout().execute(EnterAlternateScreen)?.execute(Hide)?;
     enable_raw_mode()?;
-    let WindowSize { columns, rows, .. } = window_size()?;
-    f(columns, rows)?;
+    f()?;
     disable_raw_mode()?;
-    stdout().execute(LeaveAlternateScreen)?;
+    stdout().execute(LeaveAlternateScreen)?.execute(Show)?;
     Ok(())
 }
