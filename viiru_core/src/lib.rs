@@ -9,7 +9,10 @@ mod ui;
 use std::{collections::HashMap, io::stdout};
 
 use api::*;
-use block::{Block, Throption};
+use block::{
+    Block,
+    Throption::{Given, Void},
+};
 use crossterm::{
     event::{read, KeyCode, KeyEventKind},
     execute,
@@ -17,6 +20,7 @@ use crossterm::{
 };
 use neon::prelude::*;
 use result::undefined_or_throw;
+use state::State;
 use ui::{draw_block, in_terminal_scope, print_size};
 
 #[neon::main]
@@ -46,18 +50,36 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             ..
         } = window_size()?;
 
-        print_size(columns, rows)?;
+        // print_size(columns, rows)?;
 
-        let block = Block {
-            id: "123".into(),
-            opcode: "motion_xposition".into(),
-            parent_id: Throption::Void,
-            next_id: Throption::Void,
-            input_ids: vec![],
-            fields: HashMap::new(),
+        let mut state = State {
+            blocks: HashMap::new(),
+            variables: HashMap::new(),
+            lists: HashMap::new(),
         };
 
-        draw_block(&block, 5, 6)?;
+        state.blocks.insert(
+            "child".into(),
+            Block {
+                id: "child".into(),
+                opcode: "math_number".into(),
+                parent_id: Given("parent".into()),
+                fields: HashMap::from_iter([("NUM".into(), "12.3".into())]),
+                ..Default::default()
+            },
+        );
+
+        state.blocks.insert(
+            "parent".into(),
+            Block {
+                id: "parent".into(),
+                opcode: "motion_movesteps".into(),
+                input_ids: vec![(Some("child".into()), None)],
+                ..Default::default()
+            },
+        );
+
+        draw_block(&state, "parent", 5, 6)?;
 
         loop {
             match read()? {
@@ -69,7 +91,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                 crossterm::event::Event::Resize(w, h) => {
                     columns = w;
                     rows = h;
-                    print_size(columns, rows)?;
+                    // print_size(columns, rows)?;
                 }
                 _ => (),
             }

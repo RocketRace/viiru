@@ -15,7 +15,8 @@ pub enum Shape {
 pub struct Spec {
     pub shape: Shape,
     pub shadow: bool,
-    pub color: String, /* RRGGBB */
+    pub block_color: (u8, u8, u8),
+    pub text_color: (u8, u8, u8),
     pub head: Vec<Fragment>,
     pub mouths: Vec<(String, Vec<Fragment>)>,
 }
@@ -48,17 +49,28 @@ pub enum DefaultValue {
 
 /// panics on invalid input so be careful
 pub fn spec(s: &'static str) -> Spec {
-    let header = &s[..8];
+    let header = &s[..15];
     let shape = match s.as_bytes()[0] {
         b'<' => Shape::Hexagon,
         b'(' => Shape::Circle,
         b'{' => Shape::Stack,
         _ => panic!(),
     };
-    let shadow = s.as_bytes()[7] == b'!';
-    let color = header[1..7].to_string();
+    let shadow = s.as_bytes()[14] == b'!';
+    let block_bits = u32::from_str_radix(&header[1..7], 16).unwrap();
+    let block_color = (
+        (block_bits >> 16) as u8,
+        (block_bits >> 8) as u8,
+        block_bits as u8,
+    );
+    let text_bits = u32::from_str_radix(&header[8..14], 16).unwrap();
+    let text_color = (
+        (text_bits >> 16) as u8,
+        (text_bits >> 8) as u8,
+        text_bits as u8,
+    );
 
-    let s = &s[8..];
+    let s = &s[15..];
     let lines: Vec<_> = s
         .lines()
         .map(|l| parse_line().parse(l.as_bytes()).unwrap())
@@ -77,7 +89,8 @@ pub fn spec(s: &'static str) -> Spec {
     Spec {
         shape,
         shadow,
-        color,
+        block_color,
+        text_color,
         head,
         mouths,
     }
