@@ -62,6 +62,8 @@ pub fn draw_block(state: &State, block_id: &str, x: u16, y: u16) -> ViiruResult<
 
     queue!(stdout(), color_command)?;
 
+    let get_delimiters = |is_start, is_end| is_start && is_end;
+
     let delimeters = match spec.shape {
         Shape::Circle => ('(', ')'),
         Shape::Hexagon => ('<', '>'),
@@ -110,7 +112,11 @@ pub fn draw_block(state: &State, block_id: &str, x: u16, y: u16) -> ViiruResult<
                 }
                 Fragment::BlockInput(input_name) => {
                     if let (_, Some(child_id)) = &block.input_ids[input_index] {
-                        dy += draw_block(state, child_id, x + 1, y + dy)? - 1;
+                        let delta = draw_block(state, child_id, x + 1, y + dy)? - 1;
+                        for d in 1..=delta {
+                            queue!(stdout(), MoveTo(x, y + dy + d), color_command)?;
+                        }
+                        dy += delta;
                     } else {
                         skip_padding = true;
                     }

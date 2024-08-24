@@ -107,7 +107,18 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                 id: "parent".into(),
                 parent_id: Given("if".into()),
                 opcode: "motion_movesteps".into(),
+                next_id: Given("hide".into()),
                 input_ids: vec![(Some("op".into()), None)],
+                ..Default::default()
+            },
+        );
+
+        state.blocks.insert(
+            "hide".into(),
+            Block {
+                id: "hide".into(),
+                parent_id: Given("parent".into()),
+                opcode: "looks_hide".into(),
                 ..Default::default()
             },
         );
