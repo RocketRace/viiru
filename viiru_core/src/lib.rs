@@ -2,8 +2,8 @@ mod api;
 mod block;
 mod blocks;
 mod result;
+mod runtime;
 mod spec;
-mod state;
 mod ui;
 mod util;
 
@@ -20,7 +20,7 @@ use crossterm::{
     terminal::{window_size, Clear, ClearType, WindowSize},
 };
 use neon::prelude::*;
-use state::Runtime;
+use runtime::Runtime;
 use ui::{draw_block, in_terminal_scope};
 
 #[neon::main]
@@ -31,7 +31,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
 
 fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let api = cx.argument::<JsObject>(0)?;
-    let mut state = Runtime::init(&mut cx, api);
+    let mut state = Runtime::new(&mut cx, api);
 
     let result = in_terminal_scope(|| {
         // load_project(&mut cx, api, "example/empty.sb3")?;

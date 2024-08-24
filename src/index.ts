@@ -145,7 +145,8 @@ const detachBlock = (id: string) => {
 }
 
 // the changeBlock routines were also split apart
-// TODO: value is an object { id?: string, name: string, value: string, variableType?: string }
+// TODO: value is an object!
+// { id?: string, name: string, value: string, variableType?: string }
 const changeField = (id: string, name: string, value: string) => {
     // VARIABLE, LIST, or BROADCAST_OPTION, or variably named dropdown inputs
     (vm.runtime.getEditingTarget()?.blocks as any).changeBlock({
@@ -165,21 +166,18 @@ const changeMutation = (id: string, value: any) => {
     });
 }
 
-// todo: is this needed? the frontend doesn't care for monitors
-const changeCheckbox = (id: string, value: boolean) => {
-    (vm.runtime.getEditingTarget()?.blocks as any).changeBlock({
-        id,
-        element: 'checkbox',
-        value
-    });
-}
+const getAllBlocks = (): Record<string, object> => 
+    vm.runtime.getEditingTarget()?.blocks._blocks ?? {}
 
-const getBlock = (id: string): object | null => {
-    return vm.runtime.getEditingTarget()?.blocks.getBlock(id) ?? null
-}
-
-const getScripts = (): string[] => {
-    return (vm.runtime.getEditingTarget()?.blocks as any).getScripts() ?? []
+const getVariablesOfType = (type: "" | "list" | "broadcast_msg"): Record<string, string> => {
+    const output: Record<string, string> = {}
+    const vars = vm.runtime.getEditingTarget()?.variables ?? {};
+    Object.keys(vars).forEach(key => {
+        if (vars[key].type == type) {
+            output[key] = vars[key].name;
+        }
+    })
+    return output
 }
 
 const API = {
@@ -192,9 +190,8 @@ const API = {
     detachBlock,
     changeField,
     changeMutation,
-    changeCheckbox,
-    getBlock,
-    getScripts,
+    getAllBlocks,
+    getVariablesOfType,
 }
 
 const main = async () => {

@@ -12,8 +12,8 @@ use crate::{
     block::Throption::Given,
     blocks::BLOCKS,
     result::ViiruResult,
+    runtime::Runtime,
     spec::{Fragment, Shape},
-    state::Runtime,
     util::parse_rgb,
 };
 

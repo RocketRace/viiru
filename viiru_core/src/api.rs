@@ -172,20 +172,19 @@ pub fn change_field<'a>(
 }
 
 // todo: ChangeMutation(String, ()),
-// todo: ChangeCheckbox(String, bool),
 
-pub fn get_block<'a>(
+pub fn get_all_blocks<'a>(
     cx: &mut FunctionContext<'a>,
     api: Handle<JsObject>,
-    id: &str,
-) -> JsResult<'a, JsValue> {
-    let args = args!(cx; cx.string(id));
-    api_call(cx, api, "getBlock", args)
+) -> JsResult<'a, JsObject> {
+    api_call(cx, api, "getAllBlocks", ())
 }
 
-pub fn get_scripts<'a>(
+pub fn get_variables_of_type<'a>(
     cx: &mut FunctionContext<'a>,
     api: Handle<JsObject>,
-) -> JsResult<'a, JsArray> {
-    api_call(cx, api, "getScripts", ())
+    kind: &str,
+) -> JsResult<'a, JsObject> {
+    let args = args!(cx; cx.string(kind));
+    api_call(cx, api, "getVariablesOfType", args)
 }
