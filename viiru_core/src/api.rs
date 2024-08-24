@@ -80,30 +80,31 @@ pub fn create_block_template<'a>(
     let id = string_of(cx, id_handle);
     let spec = &BLOCKS[opcode];
     for frag in &spec.head {
-        if let crate::spec::Fragment::StrumberInput(value, Some(default)) = frag { 
+        if let crate::spec::Fragment::StrumberInput(value, Some(default)) = frag {
             let child_id = match default {
                 crate::spec::DefaultValue::Block(child_opcode) => {
                     let id_handle = create_block(cx, api, child_opcode, true, None)?;
                     string_of(cx, id_handle)
-                },
+                }
                 crate::spec::DefaultValue::Str(s) => {
                     let id_handle = create_block(cx, api, "text", true, None)?;
                     let id = string_of(cx, id_handle);
                     change_field(cx, api, &id, "TEXT", s)?;
                     id
-                },
+                }
                 crate::spec::DefaultValue::Num(n) => {
                     let id_handle = create_block(cx, api, "math_number", true, None)?;
                     let id = string_of(cx, id_handle);
                     change_field(cx, api, &id, "NUM", &n.to_string())?;
                     id
-                },
-                crate::spec::DefaultValue::Color(rgb) => {
+                }
+                crate::spec::DefaultValue::Color((r, g, b)) => {
                     let id_handle = create_block(cx, api, "colour_picker", true, None)?;
                     let id = string_of(cx, id_handle);
-                    change_field(cx, api, &id, "COLOUR", rgb)?;
+                    let rgb_string = format!("#{r:X}{g:X}{b:X}");
+                    change_field(cx, api, &id, "COLOUR", &rgb_string)?;
                     id
-                },
+                }
             };
             attach_block(cx, api, &child_id, &id, Some(value))?;
         }
@@ -164,7 +165,7 @@ pub fn change_field<'a>(
     api: Handle<JsObject>,
     id: &str,
     field: &str,
-    value: &str
+    value: &str,
 ) -> JsResult<'a, JsUndefined> {
     let args = args!(cx; cx.string(id), cx.string(field), cx.string(value));
     api_call(cx, api, "changeField", args)

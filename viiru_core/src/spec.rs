@@ -1,8 +1,12 @@
+use core::str;
+
 use pom::{
     char_class::{alphanum, digit, hex_digit},
     parser::*,
     Parser,
 };
+
+use crate::util::{assume_string, parse_rgb};
 
 #[derive(Debug)]
 pub enum Shape {
@@ -19,6 +23,7 @@ pub struct Spec {
     pub text_color: (u8, u8, u8),
     pub head: Vec<Fragment>,
     pub mouths: Vec<(String, Vec<Fragment>)>,
+    pub lines: Vec<Vec<Fragment>>,
 }
 
 #[derive(Debug, Clone)]
@@ -44,7 +49,7 @@ pub enum DefaultValue {
     Block(String),
     Str(String),
     Num(f64),
-    Color(String /* #RRGGBB */),
+    Color((u8, u8, u8)),
 }
 
 /// panics on invalid input so be careful
@@ -57,18 +62,8 @@ pub fn spec(s: &'static str) -> Spec {
         _ => panic!(),
     };
     let shadow = s.as_bytes()[14] == b'!';
-    let block_bits = u32::from_str_radix(&header[1..7], 16).unwrap();
-    let block_color = (
-        (block_bits >> 16) as u8,
-        (block_bits >> 8) as u8,
-        block_bits as u8,
-    );
-    let text_bits = u32::from_str_radix(&header[8..14], 16).unwrap();
-    let text_color = (
-        (text_bits >> 16) as u8,
-        (text_bits >> 8) as u8,
-        text_bits as u8,
-    );
+    let block_color = parse_rgb(&header[1..7]);
+    let text_color = parse_rgb(&header[8..14]);
 
     let s = &s[15..];
     let lines: Vec<_> = s
@@ -93,17 +88,16 @@ pub fn spec(s: &'static str) -> Spec {
         text_color,
         head,
         mouths,
+        lines,
     }
 }
 
 fn id() -> Parser<u8, String> {
-    (is_a(alphanum) | sym(b'_'))
-        .repeat(1..)
-        .map(|cs| String::from_utf8(cs).unwrap())
+    (is_a(alphanum) | sym(b'_')).repeat(1..).map(assume_string)
 }
 
 fn string() -> Parser<u8, String> {
-    (sym(b'"') * none_of(b"\"").repeat(0..) - sym(b'"')).map(|s| String::from_utf8(s).unwrap())
+    (sym(b'"') * none_of(b"\"").repeat(0..) - sym(b'"')).map(assume_string)
 }
 
 fn number() -> Parser<u8, f64> {
@@ -112,7 +106,7 @@ fn number() -> Parser<u8, f64> {
             // definitely suboptimal
             big.push(b'.');
             big.append(&mut small);
-            let s = String::from_utf8(big).unwrap();
+            let s = assume_string(big);
             let pos: f64 = s.parse().unwrap();
             if negative.is_some() {
                 -pos
@@ -143,12 +137,8 @@ fn default_value() -> Parser<u8, DefaultValue> {
         * (string().map(DefaultValue::Str)
             | number().map(DefaultValue::Num)
             | id().map(DefaultValue::Block)
-            | (sym(b'#') * is_a(hex_digit).repeat(6)).map(|mut digits| {
-                // unnecessary but whatever
-                digits.insert(0, b'#');
-                let s = String::from_utf8(digits).unwrap();
-                DefaultValue::Color(s)
-            }))
+            | (sym(b'#') * is_a(hex_digit).repeat(6))
+                .map(|digits| DefaultValue::Color(parse_rgb(&assume_string(digits)))))
 }
 
 fn parse_line() -> Parser<u8, Vec<Fragment>> {
@@ -160,6 +150,6 @@ fn parse_line() -> Parser<u8, Vec<Fragment>> {
         | sym(b'\t').map(|_| Fragment::Expander)
         | none_of(b"(<{[")
             .repeat(1..)
-            .map(|s| Fragment::Text(String::from_utf8(s).unwrap())))
+            .map(|s| Fragment::Text(assume_string(s))))
     .repeat(1..)
 }

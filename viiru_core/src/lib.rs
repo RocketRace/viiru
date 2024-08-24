@@ -5,6 +5,7 @@ mod result;
 mod spec;
 mod state;
 mod ui;
+mod util;
 
 use std::{collections::HashMap, io::stdout};
 
@@ -59,12 +60,34 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         };
 
         state.blocks.insert(
+            "op".into(),
+            Block {
+                id: "op".into(),
+                opcode: "operator_add".into(),
+                parent_id: Given("parent".into()),
+                input_ids: vec![(Some("child".into()), None), (Some("empty".into()), None)],
+                ..Default::default()
+            },
+        );
+
+        state.blocks.insert(
             "child".into(),
             Block {
                 id: "child".into(),
                 opcode: "math_number".into(),
-                parent_id: Given("parent".into()),
+                parent_id: Given("op".into()),
                 fields: HashMap::from_iter([("NUM".into(), "12.3".into())]),
+                ..Default::default()
+            },
+        );
+
+        state.blocks.insert(
+            "empty".into(),
+            Block {
+                id: "empty".into(),
+                opcode: "text".into(),
+                parent_id: Given("op".into()),
+                fields: HashMap::from_iter([("TEXT".into(), "".into())]),
                 ..Default::default()
             },
         );
@@ -74,12 +97,23 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             Block {
                 id: "parent".into(),
                 opcode: "motion_movesteps".into(),
-                input_ids: vec![(Some("child".into()), None)],
+                input_ids: vec![(Some("op".into()), None)],
                 ..Default::default()
             },
         );
 
-        draw_block(&state, "parent", 5, 6)?;
+        state.blocks.insert(
+            "start".into(),
+            Block {
+                id: "start".into(),
+                opcode: "event_whenflagclicked".into(),
+                next_id: Given("parent".into()),
+                ..Default::default()
+            },
+        );
+
+        draw_block(&state, "start", 5, 6)?;
+        draw_block(&state, "parent", 5, 8)?;
 
         loop {
             match read()? {
