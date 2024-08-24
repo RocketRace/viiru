@@ -6,7 +6,10 @@ use pom::{
     Parser,
 };
 
-use crate::util::{assume_string, parse_rgb};
+use crate::{
+    block::Block,
+    util::{assume_string, parse_rgb},
+};
 
 #[derive(Debug)]
 pub enum Shape {
@@ -22,9 +25,20 @@ pub struct Spec {
     pub is_hat: bool,
     pub block_color: (u8, u8, u8),
     pub text_color: (u8, u8, u8),
-    pub head: Vec<Fragment>,
-    pub mouths: Vec<(String, Vec<Fragment>)>,
     pub lines: Vec<Vec<Fragment>>,
+}
+
+impl Spec {
+    pub fn new_block(&self, opcode: &str, id: &str) -> Block {
+        Block {
+            id: id.to_string(),
+            opcode: opcode.to_string(),
+            parent_id: None,
+            next_id: None,
+            inputs: todo!(),
+            fields: todo!(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -70,25 +84,13 @@ pub fn spec(s: &'static str) -> Spec {
         .lines()
         .map(|l| parse_line().parse(l.as_bytes()).unwrap())
         .collect();
-    let head = lines[0].clone();
 
-    let mut mouths = vec![];
-    if lines.len() > 1 {
-        for mouth in lines[1..].chunks(2) {
-            let Fragment::BlockInput(id) = &mouth[0][0] else {
-                panic!()
-            };
-            mouths.push((id.clone(), mouth[1].clone()))
-        }
-    }
     Spec {
         shape,
         is_shadow,
         is_hat,
         block_color,
         text_color,
-        head,
-        mouths,
         lines,
     }
 }

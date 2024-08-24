@@ -9,7 +9,7 @@ use crossterm::{
 };
 
 use crate::{
-    block::Throption::Given,
+    block::{Field, Input},
     opcodes::BLOCKS,
     result::ViiruResult,
     runtime::Runtime,
@@ -77,8 +77,11 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: u16, y: u16) -> ViiruResul
                     max_width = max_width.max(dx);
                 }
                 Fragment::StrumberInput(input_name, default) => {
-                    let (shadow, cover) = &block.input_ids[input_name];
-                    let topmost = cover.clone().or(shadow.clone());
+                    let Input {
+                        shadow_id,
+                        block_id,
+                    } = &block.inputs[input_name];
+                    let topmost = block_id.clone().or(shadow_id.clone());
                     if let Some(input_id) = topmost {
                         let delta = draw_block(state, &input_id, x + dx, y + dy)?;
                         dx += delta;
@@ -91,7 +94,7 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: u16, y: u16) -> ViiruResul
                     }
                 }
                 Fragment::BooleanInput(input_name) => {
-                    if let (_, Some(child_id)) = &block.input_ids[input_name] {
+                    if let Some(child_id) = &block.inputs[input_name].block_id {
                         let delta = draw_block(state, child_id, x + dx, y + dy)?;
                         dx += delta;
                         max_width = max_width.max(dx);
@@ -103,7 +106,7 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: u16, y: u16) -> ViiruResul
                     }
                 }
                 Fragment::BlockInput(input_name) => {
-                    if let (_, Some(child_id)) = &block.input_ids[input_name] {
+                    if let Some(child_id) = &block.inputs[input_name].block_id {
                         let delta = draw_block(state, child_id, x + 1, y + dy)? - 1;
                         for d in 1..=delta {
                             queue!(stdout(), MoveTo(x, y + dy + d), color_command)?;
@@ -145,13 +148,15 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: u16, y: u16) -> ViiruResul
                     max_width = max_width.max(dx);
                 }
                 Fragment::FieldText(field) => {
-                    let (text, _) = block.fields.get(field).unwrap();
+                    let Field { text, .. } = block.fields.get(field).unwrap();
                     queue!(stdout(), Print(text))?;
                     dx += text.chars().count() as u16;
                     max_width = max_width.max(dx);
                 }
                 Fragment::CustomColour(field) => {
-                    let (rgb_string, _) = block.fields.get(field).unwrap();
+                    let Field {
+                        text: rgb_string, ..
+                    } = block.fields.get(field).unwrap();
                     let (r, g, b) = parse_rgb(rgb_string);
                     queue!(
                         stdout(),

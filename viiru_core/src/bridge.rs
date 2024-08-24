@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use neon::{prelude::*, types::function::Arguments};
 
-use crate::{block::Block, opcodes::BLOCKS};
+use crate::block::{Block, Field, Input};
 
-fn string_of(cx: &mut FunctionContext, s: Handle<JsString>) -> String {
+pub fn string_of(cx: &mut FunctionContext, s: Handle<JsString>) -> String {
     String::from_utf16(&s.to_utf16(cx)).unwrap()
 }
 
@@ -40,20 +40,21 @@ fn optional_str_value<'js>(
     }
 }
 
-fn map_each_value<'js, F, R>(
+pub fn map_each_value<'js, F, V, R>(
     cx: &mut FunctionContext<'js>,
     object: Handle<'js, JsObject>,
     mut f: F,
 ) -> NeonResult<HashMap<String, R>>
 where
-    F: FnMut(&mut FunctionContext<'js>, Handle<'js, JsObject>) -> NeonResult<R>,
+    F: FnMut(&mut FunctionContext<'js>, Handle<'js, V>) -> NeonResult<R>,
+    V: Value,
 {
     let keys = object.get_own_property_names(cx)?;
     let length = keys.len(cx);
     let mut output = HashMap::new();
     for i in 0..length {
         let key = str_index(cx, keys, i)?;
-        let value: Handle<JsObject> = object.get(cx, key.as_str())?;
+        let value: Handle<V> = object.get(cx, key.as_str())?;
         let result = f(cx, value)?;
         output.insert(key, result);
     }
@@ -70,18 +71,21 @@ pub fn to_block<'js>(
     let next_id = optional_str_value(cx, object, "next")?;
 
     let inputs_obj: Handle<JsObject> = object.get(cx, "inputs")?;
-    let input_ids = map_each_value(cx, inputs_obj, |cx, input| {
+    let inputs = map_each_value(cx, inputs_obj, |cx, input| {
         let block_id = optional_str_value(cx, input, "block")?;
         let shadow_id = optional_str_value(cx, input, "shadow")?;
-        Ok((shadow_id, block_id))
+        Ok(Input {
+            shadow_id,
+            block_id,
+        })
     })?;
 
     let fields_obj: Handle<JsObject> = object.get(cx, "fields")?;
     let fields = map_each_value(cx, fields_obj, |cx, field| {
         // used for vars / lists / bcs
-        let block_id = optional_str_value(cx, field, "id")?;
-        let value = str_value(cx, field, "value")?;
-        Ok((value, block_id))
+        let id = optional_str_value(cx, field, "id")?;
+        let text = str_value(cx, field, "value")?;
+        Ok(Field { text, id })
     })?;
 
     Ok(Block {
@@ -89,7 +93,7 @@ pub fn to_block<'js>(
         opcode,
         parent_id,
         next_id,
-        input_ids,
+        inputs,
         fields,
     })
 }
@@ -150,54 +154,11 @@ pub fn create_block<'js>(
     id: Option<&str>,
 ) -> JsResult<'js, JsString> {
     let args = id.map_or(
-        // this is one way to do it, comment "uwu" if you prefer this one
+        // this is the wrong way to do it, comment "uwu" below if you agree
         args!(cx; cx.string(opcode), cx.boolean(is_shadow), cx.undefined()),
         |id| args!(cx; cx.string(opcode), cx.boolean(is_shadow), cx.string(id)),
     );
     api_call(cx, api, "createBlock", args)
-}
-
-// special
-pub fn create_block_template<'js>(
-    cx: &mut FunctionContext<'js>,
-    api: Handle<JsObject>,
-    opcode: &str,
-    id: Option<&str>,
-) -> JsResult<'js, JsString> {
-    let id_handle = create_block(cx, api, opcode, false, id)?;
-    let id = string_of(cx, id_handle);
-    let spec = &BLOCKS[opcode];
-    for frag in &spec.head {
-        if let crate::spec::Fragment::StrumberInput(value, Some(default)) = frag {
-            let child_id = match default {
-                crate::spec::DefaultValue::Block(child_opcode) => {
-                    let id_handle = create_block(cx, api, child_opcode, true, None)?;
-                    string_of(cx, id_handle)
-                }
-                crate::spec::DefaultValue::Str(s) => {
-                    let id_handle = create_block(cx, api, "text", true, None)?;
-                    let id = string_of(cx, id_handle);
-                    change_field(cx, api, &id, "TEXT", s)?;
-                    id
-                }
-                crate::spec::DefaultValue::Num(n) => {
-                    let id_handle = create_block(cx, api, "math_number", true, None)?;
-                    let id = string_of(cx, id_handle);
-                    change_field(cx, api, &id, "NUM", &n.to_string())?;
-                    id
-                }
-                crate::spec::DefaultValue::Color((r, g, b)) => {
-                    let id_handle = create_block(cx, api, "colour_picker", true, None)?;
-                    let id = string_of(cx, id_handle);
-                    let rgb_string = format!("#{r:X}{g:X}{b:X}");
-                    change_field(cx, api, &id, "COLOUR", &rgb_string)?;
-                    id
-                }
-            };
-            attach_block(cx, api, &child_id, &id, Some(value))?;
-        }
-    }
-    Ok(id_handle)
 }
 
 pub fn delete_block<'js>(
@@ -229,7 +190,7 @@ pub fn attach_block<'js>(
 ) -> JsResult<'js, JsUndefined> {
     let args = args!(
         cx; cx.string(id), cx.string(parent_id),
-        // this is another way, comment "awa" if you prefer this one
+        // this is the right way, comment "awa" if you prefer this one
         if let Some(input_name) = input_name {
             cx.string(input_name).as_value(cx)
         } else {
@@ -251,15 +212,20 @@ pub fn detach_block<'js>(
 pub fn change_field<'js>(
     cx: &mut FunctionContext<'js>,
     api: Handle<JsObject>,
-    id: &str,
+    block_id: &str,
     field: &str,
-    value: &str,
+    text: &str,
+    data_id: Option<&str>,
 ) -> JsResult<'js, JsUndefined> {
-    let args = args!(cx; cx.string(id), cx.string(field), cx.string(value));
+    let args = args!(cx; cx.string(block_id), cx.string(field), cx.string(text), if let Some(data_id) = data_id {
+        cx.string(data_id).as_value(cx)
+    } else {
+        cx.null().as_value(cx)
+    });
     api_call(cx, api, "changeField", args)
 }
 
-// todo: ChangeMutation(String, ()),
+// todo: ChangeMutation(String, ())
 
 pub fn get_all_blocks<'js>(
     cx: &mut FunctionContext<'js>,
@@ -268,11 +234,22 @@ pub fn get_all_blocks<'js>(
     api_call(cx, api, "getAllBlocks", ())
 }
 
+pub enum VariableType {
+    Scalar,
+    List,
+    Broadcast,
+}
+
 pub fn get_variables_of_type<'js>(
     cx: &mut FunctionContext<'js>,
     api: Handle<JsObject>,
-    kind: &str,
+    variable_type: VariableType,
 ) -> JsResult<'js, JsObject> {
-    let args = args!(cx; cx.string(kind));
+    let s = match variable_type {
+        VariableType::Scalar => "",
+        VariableType::List => "list",
+        VariableType::Broadcast => "broadcast_msg",
+    };
+    let args = args!(cx; cx.string(s));
     api_call(cx, api, "getVariablesOfType", args)
 }

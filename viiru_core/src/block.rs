@@ -16,14 +16,16 @@ pub struct Block {
     pub opcode: String,
     pub parent_id: Option<String>,
     pub next_id: Option<String>,
-    pub input_ids: HashMap<String, (Option<String>, Option<String>)>,
-    pub fields: HashMap<String, (String, Option<String>)>,
+    pub inputs: HashMap<String, Input>,
+    pub fields: HashMap<String, Field>,
 }
 
-impl Block {
-    pub fn new_from_template(opcode: &str) -> Block {
-        let spec = &BLOCKS[opcode];
+pub struct Input {
+    pub shadow_id: Option<String>,
+    pub block_id: Option<String>,
+}
 
-        todo!()
-    }
+pub struct Field {
+    pub text: String,
+    pub id: Option<String>,
 }
