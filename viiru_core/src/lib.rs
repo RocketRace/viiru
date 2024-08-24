@@ -10,10 +10,7 @@ mod util;
 use std::{collections::HashMap, io::stdout};
 
 use api::*;
-use block::{
-    Block,
-    Throption::{Given, Void},
-};
+use block::{Block, Throption::Given};
 use crossterm::{
     event::{read, KeyCode, KeyEventKind},
     execute,
@@ -22,7 +19,7 @@ use crossterm::{
 use neon::prelude::*;
 use result::undefined_or_throw;
 use state::State;
-use ui::{draw_block, in_terminal_scope, print_size};
+use ui::{draw_block, in_terminal_scope};
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
@@ -51,13 +48,41 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             ..
         } = window_size()?;
 
-        // print_size(columns, rows)?;
-
         let mut state = State {
             blocks: HashMap::new(),
             variables: HashMap::new(),
             lists: HashMap::new(),
         };
+
+        state.blocks.insert(
+            "start".into(),
+            Block {
+                id: "start".into(),
+                opcode: "event_whenflagclicked".into(),
+                next_id: Given("if".into()),
+                ..Default::default()
+            },
+        );
+
+        state.blocks.insert(
+            "if".into(),
+            Block {
+                id: "if".into(),
+                opcode: "control_if_else".into(),
+                input_ids: vec![(None, None), (None, Some("parent".into())), (None, None)],
+                ..Default::default()
+            },
+        );
+
+        state.blocks.insert(
+            "parent".into(),
+            Block {
+                id: "parent".into(),
+                opcode: "motion_movesteps".into(),
+                input_ids: vec![(Some("op".into()), None)],
+                ..Default::default()
+            },
+        );
 
         state.blocks.insert(
             "op".into(),
@@ -92,28 +117,8 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             },
         );
 
-        state.blocks.insert(
-            "parent".into(),
-            Block {
-                id: "parent".into(),
-                opcode: "motion_movesteps".into(),
-                input_ids: vec![(Some("op".into()), None)],
-                ..Default::default()
-            },
-        );
-
-        state.blocks.insert(
-            "start".into(),
-            Block {
-                id: "start".into(),
-                opcode: "event_whenflagclicked".into(),
-                next_id: Given("parent".into()),
-                ..Default::default()
-            },
-        );
-
         draw_block(&state, "start", 5, 6)?;
-        draw_block(&state, "parent", 5, 8)?;
+        // draw_block(&state, "parent", 5, 8)?;
 
         loop {
             match read()? {
@@ -125,7 +130,6 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                 crossterm::event::Event::Resize(w, h) => {
                     columns = w;
                     rows = h;
-                    // print_size(columns, rows)?;
                 }
                 _ => (),
             }
