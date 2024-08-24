@@ -2,12 +2,9 @@ use std::io::{stdout, Write};
 
 use crossterm::{
     cursor::{Hide, MoveDown, MoveTo, Show},
-    execute, queue,
+    queue,
     style::{Color, Colors, Print, ResetColor, SetBackgroundColor, SetColors, SetForegroundColor},
-    terminal::{
-        disable_raw_mode, enable_raw_mode, Clear, ClearType, EnterAlternateScreen,
-        LeaveAlternateScreen,
-    },
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 
@@ -61,8 +58,6 @@ pub fn draw_block(state: &State, block_id: &str, x: u16, y: u16) -> ViiruResult<
     }
 
     queue!(stdout(), color_command)?;
-
-    let get_delimiters = |is_start, is_end| is_start && is_end;
 
     let delimeters = match spec.shape {
         Shape::Circle => ('(', ')'),
