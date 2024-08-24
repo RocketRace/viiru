@@ -58,14 +58,12 @@ pub fn draw_block(state: &State, block_id: &str, x: u16, y: u16) -> ViiruResult<
     queue!(stdout(), color_command)?;
 
     let delimeters = match spec.shape {
-        Shape::Circle => Some(('(', ')')),
-        Shape::Hexagon => Some(('<', '>')),
-        Shape::Stack => None,
+        Shape::Circle => ('(', ')'),
+        Shape::Hexagon => ('<', '>'),
+        Shape::Stack => (' ', ' '),
     };
-    if let Some((start, _)) = delimeters {
-        queue!(stdout(), Print(start))?;
-        dx += 1;
-    }
+    queue!(stdout(), Print(delimeters.0))?;
+    dx += 1;
 
     for frag in &spec.head {
         match frag {
@@ -154,10 +152,8 @@ pub fn draw_block(state: &State, block_id: &str, x: u16, y: u16) -> ViiruResult<
             crate::spec::Fragment::CustomBlock(custom) => todo!("cb"),
         }
     }
-    if let Some((_, end)) = delimeters {
-        queue!(stdout(), Print(end))?;
-        dx += 1;
-    }
+    queue!(stdout(), Print(delimeters.1))?;
+    dx += 1;
 
     queue!(stdout(), ResetColor)?;
 
