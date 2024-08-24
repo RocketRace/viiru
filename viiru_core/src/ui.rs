@@ -1,4 +1,4 @@
-use std::io::{stdout, Write};
+use std::io::stdout;
 
 use crossterm::{
     cursor::{Hide, MoveDown, MoveTo, Show},
@@ -13,7 +13,7 @@ use crate::{
     blocks::BLOCKS,
     result::ViiruResult,
     spec::{Fragment, Shape},
-    state::State,
+    state::Runtime,
     util::parse_rgb,
 };
 
@@ -30,7 +30,7 @@ where
 }
 
 /// returns either dx or dy depending on the block shape (expression or stack)
-pub fn draw_block(state: &State, block_id: &str, x: u16, y: u16) -> ViiruResult<u16> {
+pub fn draw_block(state: &Runtime, block_id: &str, x: u16, y: u16) -> ViiruResult<u16> {
     queue!(stdout(), MoveTo(x, y))?;
     let block = state.blocks.get(block_id).unwrap();
     let spec = &BLOCKS[&block.opcode];
@@ -211,7 +211,6 @@ pub fn draw_block(state: &State, block_id: &str, x: u16, y: u16) -> ViiruResult<
 
     queue!(stdout(), ResetColor)?;
 
-    stdout().flush()?;
     if let Shape::Stack = spec.shape {
         Ok(dy)
     } else {

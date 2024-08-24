@@ -7,18 +7,20 @@ mod state;
 mod ui;
 mod util;
 
-use std::{collections::HashMap, io::stdout};
+use std::{
+    collections::HashMap,
+    io::{stdout, Write},
+};
 
 use api::*;
 use block::{Block, Throption::Given};
 use crossterm::{
     event::{read, KeyCode, KeyEventKind},
-    execute,
+    execute, queue,
     terminal::{window_size, Clear, ClearType, WindowSize},
 };
 use neon::prelude::*;
-use result::undefined_or_throw;
-use state::State;
+use state::Runtime;
 use ui::{draw_block, in_terminal_scope};
 
 #[neon::main]
@@ -29,18 +31,18 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
 
 fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let api = cx.argument::<JsObject>(0)?;
+    let mut state = Runtime::init(&mut cx, api);
 
     let result = in_terminal_scope(|| {
-        load_project(&mut cx, api, "example/empty.sb3")?;
-
+        // load_project(&mut cx, api, "example/empty.sb3")?;
         execute!(stdout(), Clear(ClearType::All))?;
 
-        for (i, opcode) in blocks::OPCODES.iter().enumerate() {
-            let id = i.to_string();
-            create_block_template(&mut cx, api, opcode, Some(&id))?;
-            slide_block(&mut cx, api, &id, 100.0, (i as f64) * 100.0)?;
-        }
-        save_project(&mut cx, api, "example/output.sb3")?;
+        // for (i, opcode) in blocks::OPCODES.iter().enumerate() {
+        //     let id = i.to_string();
+        //     create_block_template(&mut cx, api, opcode, Some(&id))?;
+        //     slide_block(&mut cx, api, &id, 100.0, (i as f64) * 100.0)?;
+        // }
+        // save_project(&mut cx, api, "example/output.sb3")?;
 
         let WindowSize {
             mut columns,
@@ -48,11 +50,8 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             ..
         } = window_size()?;
 
-        let mut state = State {
-            blocks: HashMap::new(),
-            variables: HashMap::new(),
-            lists: HashMap::new(),
-        };
+        let mut cursor_x = 0;
+        let mut cursor_y = 0;
 
         state.blocks.insert(
             "start".into(),
@@ -156,14 +155,21 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             },
         );
 
-        draw_block(&state, "start", 5, 6)?;
-        // draw_block(&state, "parent", 5, 8)?;
-
         loop {
+            queue!(stdout(), Clear(ClearType::All))?;
+            draw_block(&state, "start", cursor_x, cursor_y)?;
+            stdout().flush()?;
             match read()? {
                 crossterm::event::Event::Key(event) => {
-                    if event.kind == KeyEventKind::Press && event.code == KeyCode::Char('q') {
-                        break;
+                    if event.kind == KeyEventKind::Press {
+                        match event.code {
+                            KeyCode::Char('q') => break,
+                            KeyCode::Char('h') => cursor_x -= 1,
+                            KeyCode::Char('j') => cursor_y += 1,
+                            KeyCode::Char('k') => cursor_y -= 1,
+                            KeyCode::Char('l') => cursor_x += 1,
+                            _ => (),
+                        }
                     }
                 }
                 crossterm::event::Event::Resize(w, h) => {
@@ -177,5 +183,5 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         Ok(())
     });
 
-    undefined_or_throw(&mut cx, result)
+    state.undefined_or_throw(result)
 }
