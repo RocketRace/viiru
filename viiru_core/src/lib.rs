@@ -68,8 +68,35 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             "if".into(),
             Block {
                 id: "if".into(),
+                parent_id: Given("start".into()),
                 opcode: "control_if_else".into(),
-                input_ids: vec![(None, None), (None, Some("parent".into())), (None, None)],
+                input_ids: vec![
+                    (None, Some("cond".into())),
+                    (None, Some("parent".into())),
+                    (None, None),
+                ],
+                ..Default::default()
+            },
+        );
+
+        state.blocks.insert(
+            "cond".into(),
+            Block {
+                id: "cond".into(),
+                parent_id: Given("if".into()),
+                opcode: "sensing_touchingcolor".into(),
+                input_ids: vec![(None, Some("color".into()))],
+                ..Default::default()
+            },
+        );
+
+        state.blocks.insert(
+            "color".into(),
+            Block {
+                id: "color".into(),
+                parent_id: Given("cond".into()),
+                opcode: "colour_picker".into(),
+                fields: HashMap::from_iter([("COLOUR".into(), "FF0000".into())]),
                 ..Default::default()
             },
         );
@@ -78,6 +105,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             "parent".into(),
             Block {
                 id: "parent".into(),
+                parent_id: Given("if".into()),
                 opcode: "motion_movesteps".into(),
                 input_ids: vec![(Some("op".into()), None)],
                 ..Default::default()
@@ -88,8 +116,8 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             "op".into(),
             Block {
                 id: "op".into(),
-                opcode: "operator_add".into(),
                 parent_id: Given("parent".into()),
+                opcode: "operator_add".into(),
                 input_ids: vec![(Some("child".into()), None), (Some("empty".into()), None)],
                 ..Default::default()
             },
@@ -99,8 +127,8 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             "child".into(),
             Block {
                 id: "child".into(),
-                opcode: "math_number".into(),
                 parent_id: Given("op".into()),
+                opcode: "math_number".into(),
                 fields: HashMap::from_iter([("NUM".into(), "12.3".into())]),
                 ..Default::default()
             },
@@ -110,8 +138,8 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             "empty".into(),
             Block {
                 id: "empty".into(),
-                opcode: "text".into(),
                 parent_id: Given("op".into()),
+                opcode: "text".into(),
                 fields: HashMap::from_iter([("TEXT".into(), "".into())]),
                 ..Default::default()
             },

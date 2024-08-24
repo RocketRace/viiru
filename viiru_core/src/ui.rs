@@ -1,7 +1,7 @@
 use std::io::{stdout, Write};
 
 use crossterm::{
-    cursor::{Hide, MoveTo, Show},
+    cursor::{Hide, MoveDown, MoveTo, Show},
     execute, queue,
     style::{Color, Colors, Print, ResetColor, SetBackgroundColor, SetColors, SetForegroundColor},
     terminal::{
@@ -54,6 +54,12 @@ pub fn draw_block(state: &State, block_id: &str, x: u16, y: u16) -> ViiruResult<
             b: spec.block_color.2,
         },
     ));
+
+    if spec.is_hat {
+        queue!(stdout(), MoveDown(1))?;
+        dy += 1;
+    }
+
     queue!(stdout(), color_command)?;
 
     let delimeters = match spec.shape {
@@ -113,6 +119,8 @@ pub fn draw_block(state: &State, block_id: &str, x: u16, y: u16) -> ViiruResult<
                 Fragment::Dropdown(field) => todo!("dropdown"),
                 Fragment::Expander => {
                     queue!(stdout(), Print(" ".repeat(max_width as usize - 1)))?;
+                    // - 1 because we already have the left delimiter
+                    skip_padding = true;
                     dx = max_width;
                 }
                 Fragment::Flag => {
@@ -165,10 +173,10 @@ pub fn draw_block(state: &State, block_id: &str, x: u16, y: u16) -> ViiruResult<
                     queue!(
                         stdout(),
                         SetBackgroundColor(Color::Rgb { r, g, b }),
-                        Print(" "),
+                        Print("  "),
                         color_command
                     )?;
-                    dx += 1;
+                    dx += 2;
                     max_width = max_width.max(dx);
                 }
                 Fragment::CustomBlock(custom) => todo!("cb"),
@@ -177,6 +185,7 @@ pub fn draw_block(state: &State, block_id: &str, x: u16, y: u16) -> ViiruResult<
         if !skip_padding {
             queue!(stdout(), Print(delimeters.1))?;
             dx += 1;
+            max_width = max_width.max(dx);
         }
         skip_padding = false;
 
@@ -185,6 +194,14 @@ pub fn draw_block(state: &State, block_id: &str, x: u16, y: u16) -> ViiruResult<
             dx = 0;
             queue!(stdout(), ResetColor, MoveTo(x, y + dy), color_command)?;
         }
+    }
+
+    if spec.is_hat {
+        queue!(
+            stdout(),
+            MoveTo(x, y),
+            Print(" ".repeat(max_width as usize))
+        )?;
     }
 
     if let Given(next_id) = &block.next_id {

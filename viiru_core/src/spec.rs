@@ -18,7 +18,8 @@ pub enum Shape {
 #[derive(Debug)]
 pub struct Spec {
     pub shape: Shape,
-    pub shadow: bool,
+    pub is_shadow: bool,
+    pub is_hat: bool,
     pub block_color: (u8, u8, u8),
     pub text_color: (u8, u8, u8),
     pub head: Vec<Fragment>,
@@ -61,7 +62,8 @@ pub fn spec(s: &'static str) -> Spec {
         b'{' => Shape::Stack,
         _ => panic!(),
     };
-    let shadow = s.as_bytes()[14] == b'!';
+    let is_shadow = s.as_bytes()[14] == b'!';
+    let is_hat = s.as_bytes()[14] == b'^';
     let block_color = parse_rgb(&header[1..7]);
     let text_color = parse_rgb(&header[8..14]);
 
@@ -83,7 +85,8 @@ pub fn spec(s: &'static str) -> Spec {
     }
     Spec {
         shape,
-        shadow,
+        is_shadow,
+        is_hat,
         block_color,
         text_color,
         head,
