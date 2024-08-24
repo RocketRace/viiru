@@ -39,8 +39,6 @@ pub enum Fragment {
     Clockwise,
     Anticlockwise,
     FieldText(String),
-    VariableName(String),
-    ListName(String),
     CustomColour(String),
     CustomBlock(Vec<()>),
 }
@@ -129,9 +127,7 @@ fn special() -> Parser<u8, Fragment> {
         | sym(b'[').map(|_| Fragment::Text("[".into()))
         | sym(b'{').map(|_| Fragment::Text("{".into()))
         | id().map(Fragment::Dropdown)
-        | (sym(b'=') * id()).map(Fragment::VariableName)
-        | (sym(b'*') * id()).map(Fragment::ListName)
-        | (sym(b'@') * id()).map(Fragment::FieldText)
+        | (sym(b'*') * id()).map(Fragment::FieldText)
         | (sym(b'#') * id()).map(Fragment::CustomColour)
 }
 

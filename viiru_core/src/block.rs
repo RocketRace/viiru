@@ -1,6 +1,6 @@
 use std::{collections::HashMap, default};
 
-use crate::blocks::BLOCKS;
+use crate::opcodes::BLOCKS;
 
 #[derive(Default)]
 pub enum Throption<T> {
@@ -14,10 +14,10 @@ pub enum Throption<T> {
 pub struct Block {
     pub id: String,
     pub opcode: String,
-    pub parent_id: Throption<String>,
-    pub next_id: Throption<String>,
-    pub input_ids: Vec<(Option<String>, Option<String>)>,
-    pub fields: HashMap<String, String>,
+    pub parent_id: Option<String>,
+    pub next_id: Option<String>,
+    pub input_ids: HashMap<String, (Option<String>, Option<String>)>,
+    pub fields: HashMap<String, (String, Option<String>)>,
 }
 
 impl Block {

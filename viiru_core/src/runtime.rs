@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use neon::prelude::*;
 
 use crate::{
-    api,
     block::Block,
-    blocks::BLOCKS,
+    bridge,
+    opcodes::BLOCKS,
     result::{undefined_or_throw, ViiruResult},
 };
 
@@ -40,18 +40,18 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
 
     /// Be sure to clear the screen afterwards, as this creates some spam from JS!
     pub fn load_project(&mut self, path: &str) -> JsResult<'js, JsUndefined> {
-        api::load_project(self.cx, self.api, path)?;
+        bridge::load_project(self.cx, self.api, path)?;
         todo!()
     }
 
     pub fn save_project(&mut self, path: &str) -> JsResult<'js, JsUndefined> {
-        api::save_project(self.cx, self.api, path)
+        bridge::save_project(self.cx, self.api, path)
     }
 
     pub fn create_single_block(&mut self, opcode: &str) -> JsResult<'js, JsString> {
         let is_shadow = BLOCKS[opcode].is_shadow;
         let id = self.generate_id();
-        api::create_block(self.cx, self.api, opcode, is_shadow, Some(&id));
+        bridge::create_block(self.cx, self.api, opcode, is_shadow, Some(&id));
         todo!()
     }
 
@@ -99,12 +99,12 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     }
 
     pub fn delete_block(&mut self, id: &str) -> JsResult<'js, JsUndefined> {
-        api::delete_block(self.cx, self.api, id);
+        bridge::delete_block(self.cx, self.api, id);
         todo!()
     }
 
     pub fn slide_block(&mut self, id: &str, x: f64, y: f64) -> JsResult<'js, JsUndefined> {
-        api::slide_block(self.cx, self.api, id, x, y);
+        bridge::slide_block(self.cx, self.api, id, x, y);
         todo!()
     }
 
@@ -114,12 +114,12 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         parent_id: &str,
         input_name: &str,
     ) -> JsResult<'js, JsUndefined> {
-        api::attach_block(self.cx, self.api, id, parent_id, Some(input_name));
+        bridge::attach_block(self.cx, self.api, id, parent_id, Some(input_name));
         todo!()
     }
 
     pub fn detach_block(&mut self, id: &str) -> JsResult<'js, JsUndefined> {
-        api::detach_block(self.cx, self.api, id);
+        bridge::detach_block(self.cx, self.api, id);
         todo!()
     }
 
@@ -129,19 +129,19 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         field: &str,
         value: &str,
     ) -> JsResult<'js, JsUndefined> {
-        api::change_field(self.cx, self.api, id, field, value);
+        bridge::change_field(self.cx, self.api, id, field, value);
         todo!()
     }
 
     // todo: ChangeMutation(String, ()),
 
     // internal use, only needed for synchronization
-    fn get_all_blocks(&mut self) -> JsResult<'js, JsObject> {
-        api::get_all_blocks(self.cx, self.api)
+    fn get_all_blocks(&mut self) -> NeonResult<Handle<'js, JsObject>> {
+        bridge::get_all_blocks(self.cx, self.api)
     }
 
     fn get_variables_of_type(&mut self, kind: &str) -> JsResult<'js, JsObject> {
-        api::get_variables_of_type(self.cx, self.api, kind)
+        bridge::get_variables_of_type(self.cx, self.api, kind)
     }
 
     /// Finalize results

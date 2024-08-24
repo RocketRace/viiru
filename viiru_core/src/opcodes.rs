@@ -109,7 +109,7 @@ pub static BLOCKS: LazyLock<HashMap<String, Spec>> = LazyLock::new(|| {
         ("operator_mod".into(),                  spec("(74BE65/FFFFFF)(NUM1=\"\") mod (NUM2=\"\")")),
         ("operator_round".into(),                spec("(74BE65/FFFFFF)round (NUM=\"\")")),
         ("operator_mathop".into(),               spec("(74BE65/FFFFFF)[OPERATOR] of (NUM=\"\")")),
-        ("data_variable".into(),                 spec("(F0923C/FFFFFF)[=VARIABLE]")), // dynamic label (field contains ID)
+        ("data_variable".into(),                 spec("(F0923C/FFFFFF)[*VARIABLE]")), // dynamic label (field contains ID)
         ("data_setvariableto".into(),            spec("{F0923C/FFFFFF}set [VARIABLE] to (VALUE=0.0)")),
         ("data_changevariableby".into(),         spec("{F0923C/FFFFFF}change [VARIABLE] by (VALUE=1.0)")),
         ("data_showvariable".into(),             spec("{F0923C/FFFFFF}show variable [VARIABLE]")),
@@ -140,8 +140,8 @@ pub static BLOCKS: LazyLock<HashMap<String, Spec>> = LazyLock::new(|| {
         ("sensing_keyoptions".into(),            spec("(62A6CD/FFFFFF![KEY_OPTION]")),
         ("sensing_of_object_menu".into(),        spec("(62A6CD/FFFFFF![OBJECT]")),
         // shadow blocks
-        ("math_number".into(),                   spec("(FFFFFF/595E73![@NUM]")), // dynamic label (field contains text)
-        ("text".into(),                          spec("(FFFFFF/595E73![@TEXT]")), // dynamic label (field contains text)
+        ("math_number".into(),                   spec("(FFFFFF/595E73![*NUM]")), // dynamic label (field contains text)
+        ("text".into(),                          spec("(FFFFFF/595E73![*TEXT]")), // dynamic label (field contains text)
         ("colour_picker".into(),                 spec("(FFFFFF/595E73![#COLOUR]")), // dynamic label (field contains color)
     ])
 });

@@ -1,6 +1,6 @@
-mod api;
 mod block;
-mod blocks;
+mod bridge;
+mod opcodes;
 mod result;
 mod runtime;
 mod spec;
@@ -12,8 +12,7 @@ use std::{
     io::{stdout, Write},
 };
 
-use api::*;
-use block::{Block, Throption::Given};
+use block::Block;
 use crossterm::{
     event::{read, KeyCode, KeyEventKind},
     execute, queue,
@@ -58,7 +57,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             Block {
                 id: "start".into(),
                 opcode: "event_whenflagclicked".into(),
-                next_id: Given("if".into()),
+                next_id: Some("if".into()),
                 ..Default::default()
             },
         );
@@ -67,13 +66,13 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             "if".into(),
             Block {
                 id: "if".into(),
-                parent_id: Given("start".into()),
+                parent_id: Some("start".into()),
                 opcode: "control_if_else".into(),
-                input_ids: vec![
-                    (None, Some("cond".into())),
-                    (None, Some("parent".into())),
-                    (None, None),
-                ],
+                input_ids: HashMap::from_iter([
+                    ("CONDITION".into(), (None, Some("cond".into()))),
+                    ("SUBSTACK".into(), (None, Some("parent".into()))),
+                    ("SUBSTACK2".into(), (None, None)),
+                ]),
                 ..Default::default()
             },
         );
@@ -82,9 +81,9 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             "cond".into(),
             Block {
                 id: "cond".into(),
-                parent_id: Given("if".into()),
+                parent_id: Some("if".into()),
                 opcode: "sensing_touchingcolor".into(),
-                input_ids: vec![(None, Some("color".into()))],
+                input_ids: HashMap::from_iter([("COLOR".into(), (None, Some("color".into())))]),
                 ..Default::default()
             },
         );
@@ -93,9 +92,9 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             "color".into(),
             Block {
                 id: "color".into(),
-                parent_id: Given("cond".into()),
+                parent_id: Some("cond".into()),
                 opcode: "colour_picker".into(),
-                fields: HashMap::from_iter([("COLOUR".into(), "FF0000".into())]),
+                fields: HashMap::from_iter([("COLOUR".into(), ("FF0000".into(), None))]),
                 ..Default::default()
             },
         );
@@ -104,10 +103,10 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             "parent".into(),
             Block {
                 id: "parent".into(),
-                parent_id: Given("if".into()),
+                parent_id: Some("if".into()),
                 opcode: "motion_movesteps".into(),
-                next_id: Given("hide".into()),
-                input_ids: vec![(Some("op".into()), None)],
+                next_id: Some("hide".into()),
+                input_ids: HashMap::from_iter([("STEPS".into(), (Some("op".into()), None))]),
                 ..Default::default()
             },
         );
@@ -116,7 +115,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             "hide".into(),
             Block {
                 id: "hide".into(),
-                parent_id: Given("parent".into()),
+                parent_id: Some("parent".into()),
                 opcode: "looks_hide".into(),
                 ..Default::default()
             },
@@ -126,9 +125,12 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             "op".into(),
             Block {
                 id: "op".into(),
-                parent_id: Given("parent".into()),
+                parent_id: Some("parent".into()),
                 opcode: "operator_add".into(),
-                input_ids: vec![(Some("child".into()), None), (Some("empty".into()), None)],
+                input_ids: HashMap::from_iter([
+                    ("NUM1".into(), (Some("child".into()), None)),
+                    ("NUM2".into(), (Some("empty".into()), None)),
+                ]),
                 ..Default::default()
             },
         );
@@ -137,9 +139,9 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             "child".into(),
             Block {
                 id: "child".into(),
-                parent_id: Given("op".into()),
+                parent_id: Some("op".into()),
                 opcode: "math_number".into(),
-                fields: HashMap::from_iter([("NUM".into(), "12.3".into())]),
+                fields: HashMap::from_iter([("NUM".into(), ("12.3".into(), None))]),
                 ..Default::default()
             },
         );
@@ -148,9 +150,9 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             "empty".into(),
             Block {
                 id: "empty".into(),
-                parent_id: Given("op".into()),
+                parent_id: Some("op".into()),
                 opcode: "text".into(),
-                fields: HashMap::from_iter([("TEXT".into(), "".into())]),
+                fields: HashMap::from_iter([("TEXT".into(), ("".into(), None))]),
                 ..Default::default()
             },
         );

@@ -10,7 +10,7 @@ use crossterm::{
 
 use crate::{
     block::Throption::Given,
-    blocks::BLOCKS,
+    opcodes::BLOCKS,
     result::ViiruResult,
     runtime::Runtime,
     spec::{Fragment, Shape},
@@ -37,7 +37,6 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: u16, y: u16) -> ViiruResul
     let mut max_width = 0u16;
     let mut dx = 0u16;
     let mut dy = 0u16;
-    let mut input_index = 0;
 
     let color_command = SetColors(Colors::new(
         Color::Rgb {
@@ -78,7 +77,7 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: u16, y: u16) -> ViiruResul
                     max_width = max_width.max(dx);
                 }
                 Fragment::StrumberInput(input_name, default) => {
-                    let (shadow, cover) = &block.input_ids[input_index];
+                    let (shadow, cover) = &block.input_ids[input_name];
                     let topmost = cover.clone().or(shadow.clone());
                     if let Some(input_id) = topmost {
                         let delta = draw_block(state, &input_id, x + dx, y + dy)?;
@@ -90,10 +89,9 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: u16, y: u16) -> ViiruResul
                         dx += 2;
                         max_width = max_width.max(dx);
                     }
-                    input_index += 1;
                 }
                 Fragment::BooleanInput(input_name) => {
-                    if let (_, Some(child_id)) = &block.input_ids[input_index] {
+                    if let (_, Some(child_id)) = &block.input_ids[input_name] {
                         let delta = draw_block(state, child_id, x + dx, y + dy)?;
                         dx += delta;
                         max_width = max_width.max(dx);
@@ -103,10 +101,9 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: u16, y: u16) -> ViiruResul
                         dx += 2;
                         max_width = max_width.max(dx);
                     }
-                    input_index += 1;
                 }
                 Fragment::BlockInput(input_name) => {
-                    if let (_, Some(child_id)) = &block.input_ids[input_index] {
+                    if let (_, Some(child_id)) = &block.input_ids[input_name] {
                         let delta = draw_block(state, child_id, x + 1, y + dy)? - 1;
                         for d in 1..=delta {
                             queue!(stdout(), MoveTo(x, y + dy + d), color_command)?;
@@ -115,7 +112,6 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: u16, y: u16) -> ViiruResul
                     } else {
                         skip_padding = true;
                     }
-                    input_index += 1;
                 }
                 Fragment::Dropdown(field) => todo!("dropdown"),
                 Fragment::Expander => {
@@ -149,27 +145,13 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: u16, y: u16) -> ViiruResul
                     max_width = max_width.max(dx);
                 }
                 Fragment::FieldText(field) => {
-                    let text = block.fields.get(field).unwrap();
+                    let (text, _) = block.fields.get(field).unwrap();
                     queue!(stdout(), Print(text))?;
                     dx += text.chars().count() as u16;
                     max_width = max_width.max(dx);
                 }
-                Fragment::VariableName(field) => {
-                    let id = block.fields.get(field).unwrap();
-                    let name = state.variables.get(id).unwrap();
-                    queue!(stdout(), Print(name))?;
-                    dx += name.chars().count() as u16;
-                    max_width = max_width.max(dx);
-                }
-                Fragment::ListName(field) => {
-                    let id = block.fields.get(field).unwrap();
-                    let name = state.lists.get(id).unwrap();
-                    queue!(stdout(), Print(name))?;
-                    dx += name.chars().count() as u16;
-                    max_width = max_width.max(dx);
-                }
                 Fragment::CustomColour(field) => {
-                    let rgb_string = block.fields.get(field).unwrap();
+                    let (rgb_string, _) = block.fields.get(field).unwrap();
                     let (r, g, b) = parse_rgb(rgb_string);
                     queue!(
                         stdout(),
@@ -180,7 +162,7 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: u16, y: u16) -> ViiruResul
                     dx += 2;
                     max_width = max_width.max(dx);
                 }
-                Fragment::CustomBlock(custom) => todo!("cb"),
+                Fragment::CustomBlock(custom) => todo!("custom block"),
             }
         }
         if !skip_padding {
@@ -205,7 +187,7 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: u16, y: u16) -> ViiruResul
         )?;
     }
 
-    if let Given(next_id) = &block.next_id {
+    if let Some(next_id) = &block.next_id {
         dy += draw_block(state, next_id, x, y + dy)?;
     }
 
