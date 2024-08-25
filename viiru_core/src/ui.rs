@@ -4,8 +4,7 @@ use crossterm::{
     cursor::{Hide, MoveDown, MoveLeft, MoveTo, Show},
     queue,
     style::{
-        Attribute, Color, Colors, ContentStyle, Print, ResetColor, SetAttribute, SetColors,
-        SetStyle,
+        Attribute, Color, Colors, Print, ResetColor, SetAttribute, SetColors, SetForegroundColor,
     },
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
@@ -265,11 +264,15 @@ pub fn draw_block(runtime: &Runtime, block_id: &str, x: i32, y: i32) -> ViiruRes
 
 pub fn draw_viewport_border(runtime: &Runtime) -> ViiruResult<()> {
     let vp = &runtime.viewport;
-    let border_colors = Colors::new(Color::Green, Color::Reset);
+    let border_color = Color::Rgb {
+        r: 0x7f,
+        g: 0x3e,
+        b: 0xcf,
+    };
     queue!(
         stdout(),
-        ResetColor,
         SetAttribute(Attribute::Bold),
+        SetForegroundColor(border_color),
         MoveTo(vp.x_min as u16, vp.y_min as u16 - 1),
         Print("-".repeat((vp.x_max - vp.x_min) as usize)),
         MoveTo(vp.x_min as u16, vp.y_max as u16),
@@ -293,7 +296,49 @@ pub fn draw_viewport_border(runtime: &Runtime) -> ViiruResult<()> {
         Print("'"),
         MoveTo(vp.x_max as u16, vp.y_max as u16),
         Print("'"),
-        SetAttribute(Attribute::NoBold)
+        SetAttribute(Attribute::NormalIntensity),
+        ResetColor
+    )?;
+    Ok(())
+}
+
+pub fn draw_cursor_lines(runtime: &Runtime) -> ViiruResult<()> {
+    let vp = &runtime.viewport;
+    queue!(
+        stdout(),
+        MoveTo(
+            vp.x_min as u16,
+            (runtime.cursor_y - runtime.scroll_y) as u16
+        ),
+        Print("-".repeat((vp.x_max - vp.x_min) as usize)),
+    )?;
+    queue!(
+        stdout(),
+        MoveTo(
+            (runtime.cursor_x - runtime.scroll_x) as u16,
+            vp.y_min as u16
+        )
+    )?;
+    for _ in vp.y_min..vp.y_max {
+        queue!(stdout(), Print("|"), MoveDown(1), MoveLeft(1))?;
+    }
+    Ok(())
+}
+
+pub fn draw_cursor(runtime: &Runtime) -> ViiruResult<()> {
+    let cursor_color = Colors::new(Color::Black, Color::White);
+    queue!(stdout(), SetAttribute(Attribute::Bold))?;
+    print_in_view(
+        runtime,
+        runtime.cursor_x,
+        runtime.cursor_y,
+        "+",
+        cursor_color,
+    )?;
+    queue!(
+        stdout(),
+        ResetColor,
+        SetAttribute(Attribute::NormalIntensity)
     )?;
     Ok(())
 }

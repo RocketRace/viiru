@@ -17,7 +17,7 @@ use crossterm::{
 use neon::prelude::*;
 use opcodes::OPCODES;
 use runtime::Runtime;
-use ui::{draw_block, draw_viewport_border, in_terminal_scope};
+use ui::{draw_block, draw_cursor, draw_cursor_lines, draw_viewport_border, in_terminal_scope};
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
@@ -38,11 +38,17 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             runtime.slide_block(&id, 100, (i as i32) * 100)?;
         }
 
+        let viewport_offset_x = 3;
+        let viewport_offset_y = 3;
+
+        runtime.scroll_x = -viewport_offset_x;
+        runtime.scroll_y = -viewport_offset_y;
+
         let WindowSize { columns, rows, .. } = window_size()?;
 
-        runtime.viewport.x_min = 3;
+        runtime.viewport.x_min = viewport_offset_x;
         runtime.viewport.x_max = columns as i32 - 10;
-        runtime.viewport.y_min = 2;
+        runtime.viewport.y_min = viewport_offset_y;
         runtime.viewport.y_max = rows as i32 - 5;
 
         // let (start, _) = state.create_block_template("event_whenflagclicked")?;
@@ -70,6 +76,8 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         loop {
             queue!(stdout(), Clear(ClearType::All))?;
             // draw_block(&state, &start, cursor_x, cursor_y)?;
+            draw_viewport_border(&runtime)?;
+            draw_cursor_lines(&runtime)?;
             for top_id in &runtime.top_level {
                 // if top_id != &start {
                 draw_block(
@@ -80,7 +88,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                 )?;
                 // }
             }
-            draw_viewport_border(&runtime)?;
+            draw_cursor(&runtime)?;
             stdout().flush()?;
             match read()? {
                 crossterm::event::Event::Key(event) => {
@@ -90,10 +98,26 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                 runtime.save_project("example/output.sb3")?;
                                 break;
                             }
-                            KeyCode::Char('h') => runtime.scroll_x -= 1,
-                            KeyCode::Char('j') => runtime.scroll_y += 1,
-                            KeyCode::Char('k') => runtime.scroll_y -= 1,
-                            KeyCode::Char('l') => runtime.scroll_x += 1,
+                            KeyCode::Char('h') => runtime.cursor_x -= 1,
+                            KeyCode::Char('j') => runtime.cursor_y += 1,
+                            KeyCode::Char('k') => runtime.cursor_y -= 1,
+                            KeyCode::Char('l') => runtime.cursor_x += 1,
+                            KeyCode::Char('H') => {
+                                runtime.scroll_x -= 1;
+                                runtime.cursor_x -= 1;
+                            }
+                            KeyCode::Char('J') => {
+                                runtime.scroll_y += 1;
+                                runtime.cursor_y += 1;
+                            }
+                            KeyCode::Char('K') => {
+                                runtime.scroll_y -= 1;
+                                runtime.cursor_y -= 1;
+                            }
+                            KeyCode::Char('L') => {
+                                runtime.scroll_x += 1;
+                                runtime.cursor_x += 1;
+                            }
                             _ => (),
                         }
                     }
