@@ -187,6 +187,7 @@ pub fn attach_block<'js>(
     id: &str,
     parent_id: &str,
     input_name: Option<&str>,
+    is_shadow: bool,
 ) -> JsResult<'js, JsUndefined> {
     let args = args!(
         cx; cx.string(id), cx.string(parent_id),
@@ -195,7 +196,8 @@ pub fn attach_block<'js>(
             cx.string(input_name).as_value(cx)
         } else {
             cx.undefined().as_value(cx)
-        }
+        },
+        cx.boolean(is_shadow)
     );
     api_call(cx, api, "attachBlock", args)
 }

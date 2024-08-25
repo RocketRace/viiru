@@ -104,10 +104,14 @@ const slideBlock = (id: string, x: number, y: number) => {
     });
 }
 
-const attachBlock = (id: string, newParent: string, newInput?: string) => {
+const attachBlock = (id: string, newParent: string, newInput: string | undefined, isShadow: boolean) => {
     const existingParent = vm.runtime.getEditingTarget()?.blocks.getBlock(newParent)?.next;
     if (existingParent) {
         return;
+    }
+    const block = vm.runtime.getEditingTarget()?.blocks.getBlock(id);
+    if (block) {
+        block.shadow = isShadow;
     }
     (vm.runtime.getEditingTarget()?.blocks as any).moveBlock({
         id,

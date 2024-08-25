@@ -168,13 +168,26 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         todo!()
     }
 
-    pub fn delete_block(&mut self, id: &str) -> JsResult<'js, JsUndefined> {
-        bridge::delete_block(self.cx, self.api, id);
-        todo!()
+    fn delete_blocks_recursively(&mut self, id: &str) {
+        let block = self.blocks.remove(id).unwrap();
+        for input in block.inputs.values() {
+            if let Some(id) = &input.block_id {
+                self.delete_blocks_recursively(id);
+            }
+            if let Some(id) = &input.shadow_id {
+                self.delete_blocks_recursively(id);
+            }
+        }
     }
 
-    pub fn slide_block(&mut self, id: &str, x: f64, y: f64) -> JsResult<'js, JsUndefined> {
-        bridge::slide_block(self.cx, self.api, id, x, y);
+    pub fn delete_block(&mut self, id: &str) -> NeonResult<()> {
+        self.delete_blocks_recursively(id);
+        bridge::delete_block(self.cx, self.api, id)?;
+        Ok(())
+    }
+
+    pub fn slide_block(&mut self, id: &str, x: f64, y: f64) -> NeonResult<()> {
+        bridge::slide_block(self.cx, self.api, id, x, y)?;
         todo!()
     }
 
@@ -183,24 +196,65 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         id: &str,
         parent_id: &str,
         input_name: &str,
-    ) -> JsResult<'js, JsUndefined> {
-        bridge::attach_block(self.cx, self.api, id, parent_id, Some(input_name));
-        todo!()
+        is_shadow: bool,
+    ) -> NeonResult<()> {
+        let parent = self.blocks.get_mut(parent_id).unwrap();
+        parent.set_input(input_name, id, is_shadow);
+        self.blocks.get_mut(id).unwrap().parent_id = Some(parent_id.to_string());
+
+        bridge::attach_block(
+            self.cx,
+            self.api,
+            id,
+            parent_id,
+            Some(input_name),
+            is_shadow,
+        )?;
+
+        Ok(())
     }
 
-    pub fn detach_block(&mut self, id: &str) -> JsResult<'js, JsUndefined> {
-        bridge::detach_block(self.cx, self.api, id);
-        todo!()
+    pub fn detach_block(&mut self, id: &str) -> NeonResult<()> {
+        let parent_id = self.blocks[id].parent_id.clone();
+        if let Some(parent_id) = parent_id {
+            let parent = self.blocks.get_mut(&parent_id).unwrap();
+            let (input_name, is_shadow) = parent
+                .inputs
+                .iter()
+                .filter_map(|(input_name, input)| {
+                    if let Some(bid) = &input.block_id {
+                        (bid == id).then(|| (input_name.clone(), false))
+                    } else if let Some(bid) = &input.shadow_id {
+                        (bid == id).then(|| (input_name.clone(), true))
+                    } else {
+                        None
+                    }
+                })
+                .next()
+                .unwrap();
+            parent.remove_input(&input_name, is_shadow);
+        }
+        self.blocks.get_mut(id).unwrap().parent_id = None;
+        bridge::detach_block(self.cx, self.api, id)?;
+        Ok(())
     }
 
     pub fn change_field(
         &mut self,
         block_id: &str,
-        field: &str,
-        value: &str,
+        field_name: &str,
+        text: &str,
         data_id: Option<&str>,
     ) -> JsResult<'js, JsUndefined> {
-        bridge::change_field(self.cx, self.api, block_id, field, value, data_id);
+        let block = self.blocks.get_mut(block_id).unwrap();
+        block.set_field_text(field_name, text);
+        if let Some(id) = data_id {
+            block.set_field_id(field_name, id);
+        } else {
+            block.remove_field_id(field_name);
+        }
+
+        bridge::change_field(self.cx, self.api, block_id, field_name, text, data_id)?;
         todo!()
     }
 
