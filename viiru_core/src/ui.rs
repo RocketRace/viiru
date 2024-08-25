@@ -340,3 +340,27 @@ pub fn draw_cursor(runtime: &Runtime) -> ViiruResult<()> {
     )?;
     Ok(())
 }
+
+pub fn draw_marker_dots(runtime: &Runtime) -> ViiruResult<()> {
+    let x_spacing = 10;
+    let y_spacing = 5;
+    let x_first = runtime.scroll_x / x_spacing * x_spacing;
+    let y_first = runtime.scroll_y / y_spacing * y_spacing;
+
+    let dot_color = Colors::new(Color::DarkGrey, Color::Reset);
+
+    for dx in 0..1 + (runtime.viewport.x_max - runtime.viewport.x_min) / x_spacing {
+        for dy in 0..2 + (runtime.viewport.y_max - runtime.viewport.y_min) / y_spacing {
+            print_in_view(
+                runtime,
+                x_first + dx * x_spacing,
+                y_first + dy * y_spacing,
+                ".",
+                dot_color,
+            )?;
+        }
+    }
+    queue!(stdout(), ResetColor)?;
+
+    Ok(())
+}

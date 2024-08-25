@@ -19,7 +19,10 @@ use crossterm::{
 use neon::prelude::*;
 use opcodes::OPCODES;
 use runtime::Runtime;
-use ui::{draw_block, draw_cursor, draw_cursor_lines, draw_viewport_border, in_terminal_scope};
+use ui::{
+    draw_block, draw_cursor, draw_cursor_lines, draw_marker_dots, draw_viewport_border,
+    in_terminal_scope,
+};
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
@@ -83,6 +86,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             queue!(stdout(), Clear(ClearType::All))?;
             // draw_block(&state, &start, cursor_x, cursor_y)?;
             draw_viewport_border(&runtime)?;
+            draw_marker_dots(&runtime)?;
             draw_cursor_lines(&runtime)?;
             for top_id in &runtime.top_level {
                 // if top_id != &start {
