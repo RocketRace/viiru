@@ -19,6 +19,7 @@ use crossterm::{
     terminal::{window_size, Clear, ClearType, WindowSize},
 };
 use neon::prelude::*;
+use opcodes::OPCODES;
 use runtime::Runtime;
 use ui::{draw_block, in_terminal_scope};
 
@@ -36,12 +37,10 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         state.load_project("example/empty.sb3")?;
         execute!(stdout(), Clear(ClearType::All))?;
 
-        // for (i, opcode) in blocks::OPCODES.iter().enumerate() {
-        //     let id = i.to_string();
-        //     create_block_template(&mut cx, api, opcode, Some(&id))?;
-        //     slide_block(&mut cx, api, &id, 100.0, (i as f64) * 100.0)?;
-        // }
-        // save_project(&mut cx, api, "example/output.sb3")?;
+        for (i, opcode) in OPCODES.iter().enumerate() {
+            let (id, _) = state.create_block_template(opcode)?;
+            state.slide_block(&id, 100, (i as i32) * 100)?;
+        }
 
         let WindowSize {
             mut columns,
