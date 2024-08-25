@@ -10,10 +10,20 @@ use crate::{
     spec::Fragment,
 };
 
+pub struct Viewport {
+    pub x_min: i32,
+    /// exclusive
+    pub x_max: i32,
+    pub y_min: i32,
+    /// exclusive
+    pub y_max: i32,
+}
+
 pub struct Runtime<'js, 'a> {
     next_usable_id: usize,
     cx: &'a mut FunctionContext<'js>,
     api: Handle<'js, JsObject>,
+    pub viewport: Viewport,
     pub blocks: HashMap<String, Block>,
     pub top_level: HashSet<String>,
     pub variables: HashMap<String, String>,
@@ -26,6 +36,12 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         Runtime {
             next_usable_id: 0,
             cx,
+            viewport: Viewport {
+                x_min: 0,
+                x_max: 0,
+                y_min: 0,
+                y_max: 0,
+            },
             api,
             top_level: HashSet::new(),
             blocks: HashMap::new(),
@@ -33,6 +49,13 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             lists: HashMap::new(),
             broadcasts: HashMap::new(),
         }
+    }
+
+    pub fn is_in_view(&self, x: i32, y: i32) -> bool {
+        self.viewport.x_min <= x
+            && x < self.viewport.x_max
+            && self.viewport.y_min <= y
+            && y < self.viewport.y_max
     }
 
     pub fn generate_id(&mut self) -> String {

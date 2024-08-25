@@ -120,6 +120,7 @@ fn special() -> Parser<u8, Fragment> {
 fn default_value() -> Parser<u8, DefaultValue> {
     sym(b'=')
         * (string().map(DefaultValue::Str)
+            // todo: distinguish between more number types
             | sym(b'@').map(|_| DefaultValue::Num(0.0, false))
             | number().map(|x| DefaultValue::Num(x, true))
             | id().map(DefaultValue::Block)

@@ -7,12 +7,8 @@ mod spec;
 mod ui;
 mod util;
 
-use std::{
-    collections::HashMap,
-    io::{stdout, Write},
-};
+use std::io::{stdout, Write};
 
-use block::{Block, Field, Input};
 use crossterm::{
     event::{read, KeyCode, KeyEventKind},
     execute, queue,
@@ -42,11 +38,10 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             state.slide_block(&id, 100, (i as i32) * 100)?;
         }
 
-        let WindowSize {
-            mut columns,
-            mut rows,
-            ..
-        } = window_size()?;
+        let WindowSize { columns, rows, .. } = window_size()?;
+
+        state.viewport.x_max = columns as i32;
+        state.viewport.y_max = rows as i32;
 
         let mut cursor_x = 0;
         let mut cursor_y = 0;
@@ -70,6 +65,9 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let (hide, _) = state.create_block_template("looks_hide")?;
         state.attach_next(&hide, &motion)?;
 
+        let (show, _) = state.create_block_template("looks_show")?;
+        state.attach_next(&show, &hide)?;
+
         loop {
             queue!(stdout(), Clear(ClearType::All))?;
             draw_block(&state, &start, cursor_x, cursor_y)?;
@@ -91,8 +89,8 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                     }
                 }
                 crossterm::event::Event::Resize(w, h) => {
-                    columns = w;
-                    rows = h;
+                    state.viewport.x_max = w as i32;
+                    state.viewport.y_max = h as i32;
                 }
                 _ => (),
             }
