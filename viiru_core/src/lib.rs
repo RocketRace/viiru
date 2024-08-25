@@ -10,8 +10,10 @@ mod util;
 use std::io::{stdout, Write};
 
 use crossterm::{
+    cursor::MoveTo,
     event::{read, KeyCode, KeyEventKind},
     execute, queue,
+    style::Print,
     terminal::{window_size, Clear, ClearType, WindowSize},
 };
 use neon::prelude::*;
@@ -93,6 +95,17 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                 // }
             }
             draw_cursor(&runtime)?;
+            let position = format!("{},{}", runtime.cursor_x, runtime.cursor_y);
+
+            queue!(
+                stdout(),
+                MoveTo(
+                    runtime.viewport.x_max as u16 - position.len() as u16 + 1,
+                    runtime.viewport.y_max as u16 + 1,
+                ),
+                Print(position)
+            )?;
+
             stdout().flush()?;
             match read()? {
                 crossterm::event::Event::Key(event) => {
@@ -143,6 +156,9 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                             KeyCode::Char('L') => {
                                 runtime.scroll_x += 1;
                                 runtime.cursor_x += 1;
+                            }
+                            KeyCode::Char(' ') => {
+                                // interaction!
                             }
                             _ => (),
                         }
