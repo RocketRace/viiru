@@ -1,18 +1,10 @@
-use std::{collections::HashMap, default};
-
-use crate::opcodes::BLOCKS;
-
-#[derive(Default)]
-pub enum Throption<T> {
-    #[default]
-    Void,
-    Missing,
-    Given(T),
-}
+use std::collections::HashMap;
 
 #[derive(Default, Clone)]
 pub struct Block {
     pub id: String,
+    pub x: i32,
+    pub y: i32,
     pub opcode: String,
     pub parent_id: Option<String>,
     pub next_id: Option<String>,

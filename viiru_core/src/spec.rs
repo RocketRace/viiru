@@ -6,10 +6,7 @@ use pom::{
     Parser,
 };
 
-use crate::{
-    block::Block,
-    util::{assume_string, parse_rgb},
-};
+use crate::util::{assume_string, parse_rgb};
 
 #[derive(Debug)]
 pub enum Shape {
@@ -26,19 +23,6 @@ pub struct Spec {
     pub block_color: (u8, u8, u8),
     pub text_color: (u8, u8, u8),
     pub lines: Vec<Vec<Fragment>>,
-}
-
-impl Spec {
-    pub fn new_block(&self, opcode: &str, id: &str) -> Block {
-        Block {
-            id: id.to_string(),
-            opcode: opcode.to_string(),
-            parent_id: None,
-            next_id: None,
-            inputs: todo!(),
-            fields: todo!(),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -61,7 +45,7 @@ pub enum Fragment {
 pub enum DefaultValue {
     Block(String),
     Str(String),
-    Num(f64),
+    Num(f64, bool),
     Color((u8, u8, u8)),
 }
 
@@ -136,7 +120,8 @@ fn special() -> Parser<u8, Fragment> {
 fn default_value() -> Parser<u8, DefaultValue> {
     sym(b'=')
         * (string().map(DefaultValue::Str)
-            | number().map(DefaultValue::Num)
+            | sym(b'@').map(|_| DefaultValue::Num(0.0, false))
+            | number().map(|x| DefaultValue::Num(x, true))
             | id().map(DefaultValue::Block)
             | (sym(b'#') * is_a(hex_digit).repeat(6))
                 .map(|digits| DefaultValue::Color(parse_rgb(&assume_string(digits)))))

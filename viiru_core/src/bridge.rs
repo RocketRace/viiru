@@ -40,6 +40,15 @@ fn optional_str_value<'js>(
     }
 }
 
+fn num_value<'js>(
+    cx: &mut FunctionContext<'js>,
+    object: Handle<'js, JsObject>,
+    key: &str,
+) -> NeonResult<f64> {
+    let value: Handle<JsNumber> = object.get(cx, key)?;
+    Ok(value.value(cx))
+}
+
 pub fn map_each_value<'js, F, V, R>(
     cx: &mut FunctionContext<'js>,
     object: Handle<'js, JsObject>,
@@ -88,7 +97,12 @@ pub fn to_block<'js>(
         Ok(Field { text, id })
     })?;
 
+    let x = num_value(cx, object, "x")?;
+    let y = num_value(cx, object, "y")?;
+
     Ok(Block {
+        x: x as i32,
+        y: y as i32,
         id,
         opcode,
         parent_id,

@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use neon::prelude::*;
 
 use crate::{
     block::{Block, Field, Input},
     bridge::{self, map_each_value, string_of, to_block, VariableType},
-    opcodes::BLOCKS,
+    opcodes::{BLOCKS, NUMBERS_ISH},
     result::{undefined_or_throw, ViiruResult},
     spec::Fragment,
 };
@@ -15,6 +15,7 @@ pub struct Runtime<'js, 'a> {
     cx: &'a mut FunctionContext<'js>,
     api: Handle<'js, JsObject>,
     pub blocks: HashMap<String, Block>,
+    pub top_level: HashSet<String>,
     pub variables: HashMap<String, String>,
     pub lists: HashMap<String, String>,
     pub broadcasts: HashMap<String, String>,
@@ -26,6 +27,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             next_usable_id: 0,
             cx,
             api,
+            top_level: HashSet::new(),
             blocks: HashMap::new(),
             variables: HashMap::new(),
             lists: HashMap::new(),
@@ -62,7 +64,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         Ok(())
     }
 
-    pub fn create_single_block(&mut self, opcode: &str) -> JsResult<'js, JsString> {
+    pub fn create_single_block(&mut self, opcode: &str) -> NeonResult<String> {
         let spec = &BLOCKS[opcode];
         let is_shadow = spec.is_shadow;
         let id = self.generate_id();
@@ -108,11 +110,12 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
                 }
             })
             .collect();
-        bridge::create_block(self.cx, self.api, opcode, is_shadow, None)?;
         self.blocks.insert(
             id.clone(),
             Block {
-                id,
+                x: 0,
+                y: 0,
+                id: id.clone(),
                 opcode: opcode.to_string(),
                 parent_id: None,
                 next_id: None,
@@ -120,52 +123,48 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
                 fields,
             },
         );
-        todo!()
+        self.top_level.insert(id.clone());
+        // todo: perhaps we can let the vm generate the ID
+        bridge::create_block(self.cx, self.api, opcode, is_shadow, Some(&id))?;
+        Ok(id)
     }
 
-    // special
-    pub fn create_block_template(opcode: &str) -> JsResult<'js, JsString> {
-        // let id_handle = create_block(cx, api, opcode, false, id)?;
-        // let id = string_of(cx, id_handle);
+    // special!
+    pub fn create_block_template(&mut self, opcode: &str) -> NeonResult<(String, Vec<String>)> {
+        let id = self.create_single_block(opcode)?;
         let spec = &BLOCKS[opcode];
+        let mut child_ids = vec![];
         for line in &spec.lines {
             for frag in line {
-                if let crate::spec::Fragment::StrumberInput(value, Some(default)) = frag {
+                if let crate::spec::Fragment::StrumberInput(input_name, Some(default)) = frag {
                     let child_id = match default {
                         crate::spec::DefaultValue::Block(child_opcode) => {
-                            // let id_handle = create_block(cx, api, child_opcode, true, None)?;
-                            // string_of(cx, id_handle)
-                            23
+                            self.create_single_block(child_opcode)?
                         }
                         crate::spec::DefaultValue::Str(s) => {
-                            // let id_handle = create_block(cx, api, "text", true, None)?;
-                            // let id = string_of(cx, id_handle);
-                            // change_field(cx, api, &id, "TEXT", s)?;
-                            // id
-                            todo!()
+                            let text_id = self.create_single_block("text")?;
+                            self.set_field(&text_id, "TEXT", s, None)?;
+                            text_id
                         }
-                        crate::spec::DefaultValue::Num(n) => {
-                            // let id_handle = create_block(cx, api, "math_number", true, None)?;
-                            // let id = string_of(cx, id_handle);
-                            // change_field(cx, api, &id, "NUM", &n.to_string())?;
-                            // id
-                            todo!()
+                        crate::spec::DefaultValue::Num(n, visible) => {
+                            let num_id = self.create_single_block("math_number")?;
+                            let value = if *visible { &n.to_string() } else { "" };
+                            self.set_field(&num_id, "NUM", value, None)?;
+                            num_id
                         }
                         crate::spec::DefaultValue::Color((r, g, b)) => {
-                            // let id_handle = create_block(cx, api, "colour_picker", true, None)?;
-                            // let id = string_of(cx, id_handle);
-                            // let rgb_string = format!("#{r:X}{g:X}{b:X}");
-                            // change_field(cx, api, &id, "COLOUR", &rgb_string)?;
-                            // id
-                            todo!()
+                            let color_id = self.create_single_block("colour_picker")?;
+                            let rgb_string = format!("#{r:X}{g:X}{b:X}");
+                            self.set_field(&color_id, "COLOUR", &rgb_string, None)?;
+                            color_id
                         }
                     };
-                    // attach_block(cx, api, &child_id, &id, Some(value))?;
+                    self.attach_input(&child_id, &id, input_name, true)?;
+                    child_ids.push(child_id);
                 }
             }
         }
-        // Ok(id_handle)
-        todo!()
+        Ok((id, child_ids))
     }
 
     fn delete_blocks_recursively(&mut self, id: &str) {
@@ -181,17 +180,22 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     }
 
     pub fn delete_block(&mut self, id: &str) -> NeonResult<()> {
+        self.top_level.remove(id);
         self.delete_blocks_recursively(id);
         bridge::delete_block(self.cx, self.api, id)?;
         Ok(())
     }
 
-    pub fn slide_block(&mut self, id: &str, x: f64, y: f64) -> NeonResult<()> {
-        bridge::slide_block(self.cx, self.api, id, x, y)?;
-        todo!()
+    pub fn slide_block(&mut self, id: &str, x: i32, y: i32) -> NeonResult<()> {
+        let block = self.blocks.get_mut(id).unwrap();
+        block.x = x;
+        block.y = y;
+
+        bridge::slide_block(self.cx, self.api, id, x as f64, y as f64)?;
+        Ok(())
     }
 
-    pub fn attach_block(
+    pub fn attach_input(
         &mut self,
         id: &str,
         parent_id: &str,
@@ -201,6 +205,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         let parent = self.blocks.get_mut(parent_id).unwrap();
         parent.set_input(input_name, id, is_shadow);
         self.blocks.get_mut(id).unwrap().parent_id = Some(parent_id.to_string());
+        self.top_level.remove(id);
 
         bridge::attach_block(
             self.cx,
@@ -210,6 +215,25 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             Some(input_name),
             is_shadow,
         )?;
+
+        Ok(())
+    }
+
+    pub fn attach_next(&mut self, id: &str, parent_id: &str) -> NeonResult<()> {
+        let parent = self.blocks.get_mut(parent_id).unwrap();
+
+        let mut old_next_id = Some(id.to_string());
+        std::mem::swap(&mut old_next_id, &mut parent.next_id);
+
+        self.blocks.get_mut(id).unwrap().parent_id = Some(parent_id.to_string());
+        self.top_level.remove(id);
+
+        // TODO handle attaching to the middle of a stack
+        if let Some(next_id) = old_next_id {
+            todo!()
+        }
+
+        bridge::attach_block(self.cx, self.api, id, parent_id, None, false)?;
 
         Ok(())
     }
@@ -235,17 +259,18 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             parent.remove_input(&input_name, is_shadow);
         }
         self.blocks.get_mut(id).unwrap().parent_id = None;
+        self.top_level.insert(id.to_string());
         bridge::detach_block(self.cx, self.api, id)?;
         Ok(())
     }
 
-    pub fn change_field(
+    pub fn set_field(
         &mut self,
         block_id: &str,
         field_name: &str,
         text: &str,
         data_id: Option<&str>,
-    ) -> JsResult<'js, JsUndefined> {
+    ) -> NeonResult<()> {
         let block = self.blocks.get_mut(block_id).unwrap();
         block.set_field_text(field_name, text);
         if let Some(id) = data_id {
@@ -255,7 +280,17 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         }
 
         bridge::change_field(self.cx, self.api, block_id, field_name, text, data_id)?;
-        todo!()
+        Ok(())
+    }
+
+    pub fn set_strumber_field(&mut self, id: &str, text: &str) -> NeonResult<()> {
+        let block = self.blocks.get_mut(id).unwrap();
+        if block.opcode == "text" {
+            self.set_field(id, "TEXT", text, None)?;
+        } else if NUMBERS_ISH.contains(&block.opcode.as_str()) {
+            self.set_field(id, "NUM", text, None)?;
+        }
+        Ok(())
     }
 
     // todo: ChangeMutation(String, ()),

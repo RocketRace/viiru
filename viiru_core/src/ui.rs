@@ -157,7 +157,8 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: u16, y: u16) -> ViiruResul
                     let Field {
                         text: rgb_string, ..
                     } = block.fields.get(field).unwrap();
-                    let (r, g, b) = parse_rgb(rgb_string);
+                    // #RRGGBB format
+                    let (r, g, b) = parse_rgb(&rgb_string[1..]);
                     queue!(
                         stdout(),
                         SetBackgroundColor(Color::Rgb { r, g, b }),

@@ -33,7 +33,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let mut state = Runtime::new(&mut cx, api);
 
     let result = in_terminal_scope(|| {
-        // load_project(&mut cx, api, "example/empty.sb3")?;
+        state.load_project("example/empty.sb3")?;
         execute!(stdout(), Clear(ClearType::All))?;
 
         // for (i, opcode) in blocks::OPCODES.iter().enumerate() {
@@ -52,180 +52,37 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let mut cursor_x = 0;
         let mut cursor_y = 0;
 
-        state.blocks.insert(
-            "start".into(),
-            Block {
-                id: "start".into(),
-                opcode: "event_whenflagclicked".into(),
-                next_id: Some("if".into()),
-                ..Default::default()
-            },
-        );
+        let (start, _) = state.create_block_template("event_whenflagclicked")?;
 
-        state.blocks.insert(
-            "if".into(),
-            Block {
-                id: "if".into(),
-                parent_id: Some("start".into()),
-                opcode: "control_if_else".into(),
-                inputs: HashMap::from_iter([
-                    (
-                        "CONDITION".into(),
-                        Input {
-                            shadow_id: None,
-                            block_id: Some("cond".into()),
-                        },
-                    ),
-                    (
-                        "SUBSTACK".into(),
-                        Input {
-                            shadow_id: None,
-                            block_id: Some("parent".into()),
-                        },
-                    ),
-                    (
-                        "SUBSTACK2".into(),
-                        Input {
-                            shadow_id: None,
-                            block_id: None,
-                        },
-                    ),
-                ]),
-                ..Default::default()
-            },
-        );
+        let (iff, _) = state.create_block_template("control_if_else")?;
+        state.attach_next(&iff, &start)?;
 
-        state.blocks.insert(
-            "cond".into(),
-            Block {
-                id: "cond".into(),
-                parent_id: Some("if".into()),
-                opcode: "sensing_touchingcolor".into(),
-                inputs: HashMap::from_iter([(
-                    "COLOR".into(),
-                    Input {
-                        shadow_id: None,
-                        block_id: Some("color".into()),
-                    },
-                )]),
-                ..Default::default()
-            },
-        );
+        let (cond, cond_children) = state.create_block_template("sensing_touchingcolor")?;
+        state.attach_input(&cond, &iff, "CONDITION", false)?;
+        state.set_field(&cond_children[0], "COLOUR", "#FF0000", None)?;
 
-        state.blocks.insert(
-            "color".into(),
-            Block {
-                id: "color".into(),
-                parent_id: Some("cond".into()),
-                opcode: "colour_picker".into(),
-                fields: HashMap::from_iter([(
-                    "COLOUR".into(),
-                    Field {
-                        text: "FF0000".into(),
-                        id: None,
-                    },
-                )]),
-                ..Default::default()
-            },
-        );
+        let (motion, _) = state.create_block_template("motion_movesteps")?;
+        state.attach_input(&motion, &iff, "SUBSTACK", false)?;
 
-        state.blocks.insert(
-            "parent".into(),
-            Block {
-                id: "parent".into(),
-                parent_id: Some("if".into()),
-                opcode: "motion_movesteps".into(),
-                next_id: Some("hide".into()),
-                inputs: HashMap::from_iter([(
-                    "STEPS".into(),
-                    Input {
-                        block_id: Some("op".into()),
-                        shadow_id: None,
-                    },
-                )]),
-                ..Default::default()
-            },
-        );
+        let (op, op_children) = state.create_block_template("operator_add")?;
+        state.attach_input(&op, &motion, "STEPS", false)?;
+        state.set_strumber_field(&op_children[0], "12.3")?;
 
-        state.blocks.insert(
-            "hide".into(),
-            Block {
-                id: "hide".into(),
-                parent_id: Some("parent".into()),
-                opcode: "looks_hide".into(),
-                ..Default::default()
-            },
-        );
-
-        state.blocks.insert(
-            "op".into(),
-            Block {
-                id: "op".into(),
-                parent_id: Some("parent".into()),
-                opcode: "operator_add".into(),
-                inputs: HashMap::from_iter([
-                    (
-                        "NUM1".into(),
-                        Input {
-                            shadow_id: Some("child".into()),
-                            block_id: None,
-                        },
-                    ),
-                    (
-                        "NUM2".into(),
-                        Input {
-                            shadow_id: Some("empty".into()),
-                            block_id: None,
-                        },
-                    ),
-                ]),
-                ..Default::default()
-            },
-        );
-
-        state.blocks.insert(
-            "child".into(),
-            Block {
-                id: "child".into(),
-                parent_id: Some("op".into()),
-                opcode: "math_number".into(),
-                fields: HashMap::from_iter([(
-                    "NUM".into(),
-                    Field {
-                        text: "12.3".into(),
-                        id: None,
-                    },
-                )]),
-                ..Default::default()
-            },
-        );
-
-        state.blocks.insert(
-            "empty".into(),
-            Block {
-                id: "empty".into(),
-                parent_id: Some("op".into()),
-                opcode: "text".into(),
-                fields: HashMap::from_iter([(
-                    "TEXT".into(),
-                    Field {
-                        text: "".into(),
-                        id: None,
-                    },
-                )]),
-                ..Default::default()
-            },
-        );
+        let (hide, _) = state.create_block_template("looks_hide")?;
+        state.attach_next(&hide, &motion)?;
 
         loop {
             queue!(stdout(), Clear(ClearType::All))?;
-            draw_block(&state, "start", cursor_x, cursor_y)?;
+            draw_block(&state, &start, cursor_x, cursor_y)?;
             stdout().flush()?;
             match read()? {
                 crossterm::event::Event::Key(event) => {
                     if event.kind == KeyEventKind::Press {
                         match event.code {
-                            KeyCode::Char('q') => break,
+                            KeyCode::Char('q') => {
+                                state.save_project("example/output.sb3")?;
+                                break;
+                            }
                             KeyCode::Char('h') => cursor_x -= 1,
                             KeyCode::Char('j') => cursor_y += 1,
                             KeyCode::Char('k') => cursor_y -= 1,

@@ -91,14 +91,14 @@ pub static BLOCKS: LazyLock<HashMap<String, Spec>> = LazyLock::new(|| {
         ("sensing_current".into(),               spec("(71AFD2/FFFFFF)current [CURRENTMENU]")),
         ("sensing_dayssince2000".into(),         spec("(71AFD2/FFFFFF)days since 2000")),
         ("sensing_username".into(),              spec("(71AFD2/FFFFFF)username")),
-        ("operator_add".into(),                  spec("(74BE65/FFFFFF)(NUM1=\"\") + (NUM2=\"\")")),
-        ("operator_subtract".into(),             spec("(74BE65/FFFFFF)(NUM1=\"\") - (NUM2=\"\")")),
-        ("operator_multiply".into(),             spec("(74BE65/FFFFFF)(NUM1=\"\") * (NUM2=\"\")")),
-        ("operator_divide".into(),               spec("(74BE65/FFFFFF)(NUM1=\"\") / (NUM2=\"\")")),
+        ("operator_add".into(),                  spec("(74BE65/FFFFFF)(NUM1=@) + (NUM2=@)")),
+        ("operator_subtract".into(),             spec("(74BE65/FFFFFF)(NUM1=@) - (NUM2=@)")),
+        ("operator_multiply".into(),             spec("(74BE65/FFFFFF)(NUM1=@) * (NUM2=@)")),
+        ("operator_divide".into(),               spec("(74BE65/FFFFFF)(NUM1=@) / (NUM2=@)")),
         ("operator_random".into(),               spec("(74BE65/FFFFFF)pick random (FROM=1.0) to (TO=10.0)")),
-        ("operator_gt".into(),                   spec("<74BE65/FFFFFF>(OPERAND1=\"\") > (OPERAND2=50.0)")),
-        ("operator_lt".into(),                   spec("<74BE65/FFFFFF>(OPERAND1=\"\") [<] (OPERAND2=50.0)")),
-        ("operator_equals".into(),               spec("<74BE65/FFFFFF>(OPERAND1=\"\") = (OPERAND2=50.0)")),
+        ("operator_gt".into(),                   spec("<74BE65/FFFFFF>(OPERAND1=@) > (OPERAND2=50.0)")),
+        ("operator_lt".into(),                   spec("<74BE65/FFFFFF>(OPERAND1=@) [<] (OPERAND2=50.0)")),
+        ("operator_equals".into(),               spec("<74BE65/FFFFFF>(OPERAND1=@) = (OPERAND2=50.0)")),
         ("operator_and".into(),                  spec("<74BE65/FFFFFF><OPERAND1> and <OPERAND2>")),
         ("operator_or".into(),                   spec("<74BE65/FFFFFF><OPERAND1> or <OPERAND2>")),
         ("operator_not".into(),                  spec("<74BE65/FFFFFF>not <OPERAND>")),
@@ -106,9 +106,9 @@ pub static BLOCKS: LazyLock<HashMap<String, Spec>> = LazyLock::new(|| {
         ("operator_letter_of".into(),            spec("(74BE65/FFFFFF)letter (LETTER=1.0) of (STRING=\"apple\")")),
         ("operator_length".into(),               spec("(74BE65/FFFFFF)length o f(STRING=\"apple\")")),
         ("operator_contains".into(),             spec("{74BE65/FFFFFF}(STRING1=\"apple\") contains (STRING2=\"a\")?")),
-        ("operator_mod".into(),                  spec("(74BE65/FFFFFF)(NUM1=\"\") mod (NUM2=\"\")")),
-        ("operator_round".into(),                spec("(74BE65/FFFFFF)round (NUM=\"\")")),
-        ("operator_mathop".into(),               spec("(74BE65/FFFFFF)[OPERATOR] of (NUM=\"\")")),
+        ("operator_mod".into(),                  spec("(74BE65/FFFFFF)(NUM1=@) mod (NUM2=@)")),
+        ("operator_round".into(),                spec("(74BE65/FFFFFF)round (NUM=@)")),
+        ("operator_mathop".into(),               spec("(74BE65/FFFFFF)[OPERATOR] of (NUM=@)")),
         ("data_variable".into(),                 spec("(F0923C/FFFFFF)[*VARIABLE]")), // dynamic label (field contains ID)
         ("data_setvariableto".into(),            spec("{F0923C/FFFFFF}set [VARIABLE] to (VALUE=0.0)")),
         ("data_changevariableby".into(),         spec("{F0923C/FFFFFF}change [VARIABLE] by (VALUE=1.0)")),
@@ -141,10 +141,22 @@ pub static BLOCKS: LazyLock<HashMap<String, Spec>> = LazyLock::new(|| {
         ("sensing_of_object_menu".into(),        spec("(62A6CD/FFFFFF![OBJECT]")),
         // shadow blocks
         ("math_number".into(),                   spec("(FFFFFF/595E73![*NUM]")), // dynamic label (field contains text)
+        ("math_integer".into(),                  spec("(FFFFFF/595E73![*NUM]")), // dynamic label (field contains text)
+        ("math_whole_number".into(),             spec("(FFFFFF/595E73![*NUM]")), // dynamic label (field contains text)
+        ("math_positive_number".into(),          spec("(FFFFFF/595E73![*NUM]")), // dynamic label (field contains text)
+        ("math_angle".into(),                    spec("(FFFFFF/595E73![*NUM]")), // dynamic label (field contains text)
         ("text".into(),                          spec("(FFFFFF/595E73![*TEXT]")), // dynamic label (field contains text)
         ("colour_picker".into(),                 spec("(FFFFFF/595E73![#COLOUR]")), // dynamic label (field contains color)
     ])
 });
+
+pub const NUMBERS_ISH: [&str; 5] = [
+    "math_number",
+    "math_integer",
+    "math_whole_number",
+    "math_positive_number",
+    "math_angle",
+];
 
 pub const OPCODES: &[&str] = &[
     "motion_movesteps",
