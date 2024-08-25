@@ -22,6 +22,7 @@ pub struct Spec {
     pub is_hat: bool,
     pub block_color: (u8, u8, u8),
     pub text_color: (u8, u8, u8),
+    pub alt_color: (u8, u8, u8),
     pub lines: Vec<Vec<Fragment>>,
 }
 
@@ -51,19 +52,20 @@ pub enum DefaultValue {
 
 /// panics on invalid input so be careful
 pub fn spec(s: &'static str) -> Spec {
-    let header = &s[..15];
+    let header = &s[..1 + 6 + 1 + 6 + 1 + 6 + 1];
     let shape = match s.as_bytes()[0] {
         b'<' => Shape::Hexagon,
         b'(' => Shape::Circle,
         b'{' => Shape::Stack,
         _ => panic!(),
     };
-    let is_shadow = s.as_bytes()[14] == b'!';
-    let is_hat = s.as_bytes()[14] == b'^';
-    let block_color = parse_rgb(&header[1..7]);
-    let text_color = parse_rgb(&header[8..14]);
+    let is_shadow = s.as_bytes()[1 + 6 + 1 + 6 + 1 + 6] == b'!';
+    let is_hat = s.as_bytes()[1 + 6 + 1 + 6 + 1 + 6] == b'^';
+    let block_color = parse_rgb(&header[1..1 + 6]);
+    let text_color = parse_rgb(&header[1 + 6 + 1..1 + 6 + 1 + 6]);
+    let alt_color = parse_rgb(&header[1 + 6 + 1 + 6 + 1..1 + 6 + 1 + 6 + 1 + 6]);
 
-    let s = &s[15..];
+    let s = &s[1 + 6 + 1 + 6 + 1 + 6 + 1..];
     let lines: Vec<_> = s
         .lines()
         .map(|l| parse_line().parse(l.as_bytes()).unwrap())
@@ -75,6 +77,7 @@ pub fn spec(s: &'static str) -> Spec {
         is_hat,
         block_color,
         text_color,
+        alt_color,
         lines,
     }
 }

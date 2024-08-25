@@ -93,6 +93,19 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: i32, y: i32) -> ViiruResul
         },
     );
 
+    let alt_colors = Colors::new(
+        Color::Rgb {
+            r: spec.text_color.0,
+            g: spec.text_color.1,
+            b: spec.text_color.2,
+        },
+        Color::Rgb {
+            r: spec.alt_color.0,
+            g: spec.alt_color.1,
+            b: spec.alt_color.2,
+        },
+    );
+
     if spec.is_hat {
         dy += 1;
     }
@@ -126,7 +139,7 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: i32, y: i32) -> ViiruResul
                         dx += delta;
                         max_width = max_width.max(dx);
                     } else {
-                        print_in_view(state, x + dx, y + dy, "()", block_colors)?;
+                        print_in_view(state, x + dx, y + dy, "()", alt_colors)?;
                         dx += 2;
                         max_width = max_width.max(dx);
                     }
@@ -137,7 +150,7 @@ pub fn draw_block(state: &Runtime, block_id: &str, x: i32, y: i32) -> ViiruResul
                         dx += delta;
                         max_width = max_width.max(dx);
                     } else {
-                        print_in_view(state, x + dx, y + dy, "<>", block_colors)?;
+                        print_in_view(state, x + dx, y + dy, "<>", alt_colors)?;
                         dx += 2;
                         max_width = max_width.max(dx);
                     }
