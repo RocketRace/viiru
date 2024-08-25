@@ -17,7 +17,7 @@ use crossterm::{
 use neon::prelude::*;
 use opcodes::OPCODES;
 use runtime::Runtime;
-use ui::{draw_block, in_terminal_scope};
+use ui::{draw_block, draw_viewport_border, in_terminal_scope};
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
@@ -27,24 +27,23 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
 
 fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let api = cx.argument::<JsObject>(0)?;
-    let mut state = Runtime::new(&mut cx, api);
+    let mut runtime = Runtime::new(&mut cx, api);
 
     let result = in_terminal_scope(|| {
-        state.load_project("example/empty.sb3")?;
+        runtime.load_project("example/empty.sb3")?;
         execute!(stdout(), Clear(ClearType::All))?;
 
         for (i, opcode) in OPCODES.iter().enumerate() {
-            let (id, _) = state.create_block_template(opcode)?;
-            state.slide_block(&id, 100, (i as i32) * 100)?;
+            let (id, _) = runtime.create_block_template(opcode)?;
+            runtime.slide_block(&id, 100, (i as i32) * 100)?;
         }
 
         let WindowSize { columns, rows, .. } = window_size()?;
 
-        state.viewport.x_max = columns as i32;
-        state.viewport.y_max = rows as i32;
-
-        let mut cursor_x = 0;
-        let mut cursor_y = 0;
+        runtime.viewport.x_min = 3;
+        runtime.viewport.x_max = columns as i32 - 10;
+        runtime.viewport.y_min = 2;
+        runtime.viewport.y_max = rows as i32 - 5;
 
         // let (start, _) = state.create_block_template("event_whenflagclicked")?;
 
@@ -71,36 +70,37 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         loop {
             queue!(stdout(), Clear(ClearType::All))?;
             // draw_block(&state, &start, cursor_x, cursor_y)?;
-            for top_id in &state.top_level {
+            for top_id in &runtime.top_level {
                 // if top_id != &start {
                 draw_block(
-                    &state,
+                    &runtime,
                     top_id,
-                    state.blocks[top_id].x / 50,
-                    state.blocks[top_id].y / 50,
+                    runtime.blocks[top_id].x / 50,
+                    runtime.blocks[top_id].y / 50,
                 )?;
                 // }
             }
+            draw_viewport_border(&runtime)?;
             stdout().flush()?;
             match read()? {
                 crossterm::event::Event::Key(event) => {
                     if event.kind == KeyEventKind::Press {
                         match event.code {
                             KeyCode::Char('q') => {
-                                state.save_project("example/output.sb3")?;
+                                runtime.save_project("example/output.sb3")?;
                                 break;
                             }
-                            KeyCode::Char('h') => state.scroll_x -= 1,
-                            KeyCode::Char('j') => state.scroll_y += 1,
-                            KeyCode::Char('k') => state.scroll_y -= 1,
-                            KeyCode::Char('l') => state.scroll_x += 1,
+                            KeyCode::Char('h') => runtime.scroll_x -= 1,
+                            KeyCode::Char('j') => runtime.scroll_y += 1,
+                            KeyCode::Char('k') => runtime.scroll_y -= 1,
+                            KeyCode::Char('l') => runtime.scroll_x += 1,
                             _ => (),
                         }
                     }
                 }
                 crossterm::event::Event::Resize(w, h) => {
-                    state.viewport.x_max = w as i32;
-                    state.viewport.y_max = h as i32;
+                    runtime.viewport.x_max = w as i32;
+                    runtime.viewport.y_max = h as i32;
                 }
                 _ => (),
             }
@@ -109,5 +109,5 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         Ok(())
     });
 
-    state.undefined_or_throw(result)
+    runtime.undefined_or_throw(result)
 }

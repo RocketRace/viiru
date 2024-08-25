@@ -10,6 +10,7 @@ use crate::{
     spec::Fragment,
 };
 
+#[derive(Clone, Copy)]
 pub struct Viewport {
     pub x_min: i32,
     /// exclusive
