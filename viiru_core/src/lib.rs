@@ -102,10 +102,32 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                 runtime.save_project("example/output.sb3")?;
                                 break;
                             }
-                            KeyCode::Char('h') => runtime.cursor_x -= 1,
-                            KeyCode::Char('j') => runtime.cursor_y += 1,
-                            KeyCode::Char('k') => runtime.cursor_y -= 1,
-                            KeyCode::Char('l') => runtime.cursor_x += 1,
+                            KeyCode::Char('h') => {
+                                runtime.cursor_x -= 1;
+                                if runtime.cursor_x - runtime.scroll_x == runtime.viewport.y_min - 1
+                                {
+                                    runtime.scroll_x -= 1;
+                                }
+                            }
+                            KeyCode::Char('j') => {
+                                runtime.cursor_y += 1;
+                                if runtime.cursor_y - runtime.scroll_y == runtime.viewport.y_max {
+                                    runtime.scroll_y += 1;
+                                }
+                            }
+                            KeyCode::Char('k') => {
+                                runtime.cursor_y -= 1;
+                                if runtime.cursor_y - runtime.scroll_y == runtime.viewport.y_min - 1
+                                {
+                                    runtime.scroll_y -= 1;
+                                }
+                            }
+                            KeyCode::Char('l') => {
+                                runtime.cursor_x += 1;
+                                if runtime.cursor_x - runtime.scroll_x == runtime.viewport.x_max {
+                                    runtime.scroll_x += 1;
+                                }
+                            }
                             KeyCode::Char('H') => {
                                 runtime.scroll_x -= 1;
                                 runtime.cursor_x -= 1;
