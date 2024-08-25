@@ -24,6 +24,8 @@ pub struct Runtime<'js, 'a> {
     cx: &'a mut FunctionContext<'js>,
     api: Handle<'js, JsObject>,
     pub viewport: Viewport,
+    pub scroll_x: i32,
+    pub scroll_y: i32,
     pub blocks: HashMap<String, Block>,
     pub top_level: HashSet<String>,
     pub variables: HashMap<String, String>,
@@ -42,6 +44,8 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
                 y_min: 0,
                 y_max: 0,
             },
+            scroll_x: 0,
+            scroll_y: 0,
             api,
             top_level: HashSet::new(),
             blocks: HashMap::new(),
@@ -52,10 +56,10 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     }
 
     pub fn is_in_view(&self, x: i32, y: i32) -> bool {
-        self.viewport.x_min <= x
-            && x < self.viewport.x_max
-            && self.viewport.y_min <= y
-            && y < self.viewport.y_max
+        x - self.scroll_x >= self.viewport.x_min
+            && x - self.scroll_x < self.viewport.x_max
+            && y - self.scroll_y >= self.viewport.y_min
+            && y - self.scroll_y < self.viewport.y_max
     }
 
     pub fn generate_id(&mut self) -> String {

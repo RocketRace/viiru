@@ -36,24 +36,33 @@ pub fn print_in_view(
     text: &str,
     colors: Colors,
 ) -> ViiruResult<()> {
+    let screen_x = x - state.scroll_x;
+    let screen_y = y - state.scroll_y;
     // no point even trying if our starting point is bad
-    if state.viewport.y_min > y || y >= state.viewport.y_max || x >= state.viewport.x_max {
+    if screen_y < state.viewport.y_min
+        || screen_y >= state.viewport.y_max
+        || screen_x >= state.viewport.x_max
+    {
         return Ok(());
     }
     // todo: technically this should use grapheme clusters, same with .chars() everywhere below
-    if x >= state.viewport.x_min {
-        let visible_chars = state.viewport.x_max - x;
+    if screen_x >= state.viewport.x_min {
+        let visible_chars = state.viewport.x_max - screen_x;
         let chopped: String = text.chars().take(visible_chars as usize).collect();
-        queue!(stdout(), MoveTo(x as u16, y as u16), SetColors(colors))?;
+        queue!(
+            stdout(),
+            MoveTo(screen_x as u16, screen_y as u16),
+            SetColors(colors)
+        )?;
         if !chopped.is_empty() {
             queue!(stdout(), Print(chopped))?;
         }
     } else {
-        let hidden_chars = state.viewport.x_min - x;
+        let hidden_chars = state.viewport.x_min - screen_x;
         let chopped: String = text.chars().skip(hidden_chars as usize).collect();
         queue!(
             stdout(),
-            MoveTo(state.viewport.x_min as u16, y as u16),
+            MoveTo(state.viewport.x_min as u16, screen_y as u16),
             SetColors(colors),
         )?;
         if !chopped.is_empty() {

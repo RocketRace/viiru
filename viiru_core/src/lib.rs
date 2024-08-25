@@ -46,31 +46,41 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let mut cursor_x = 0;
         let mut cursor_y = 0;
 
-        let (start, _) = state.create_block_template("event_whenflagclicked")?;
+        // let (start, _) = state.create_block_template("event_whenflagclicked")?;
 
-        let (iff, _) = state.create_block_template("control_if_else")?;
-        state.attach_next(&iff, &start)?;
+        // let (iff, _) = state.create_block_template("control_if_else")?;
+        // state.attach_next(&iff, &start)?;
 
-        let (cond, cond_children) = state.create_block_template("sensing_touchingcolor")?;
-        state.attach_input(&cond, &iff, "CONDITION", false)?;
-        state.set_field(&cond_children[0], "COLOUR", "#FF0000", None)?;
+        // let (cond, cond_children) = state.create_block_template("sensing_touchingcolor")?;
+        // state.attach_input(&cond, &iff, "CONDITION", false)?;
+        // state.set_field(&cond_children[0], "COLOUR", "#FF0000", None)?;
 
-        let (motion, _) = state.create_block_template("motion_movesteps")?;
-        state.attach_input(&motion, &iff, "SUBSTACK", false)?;
+        // let (motion, _) = state.create_block_template("motion_movesteps")?;
+        // state.attach_input(&motion, &iff, "SUBSTACK", false)?;
 
-        let (op, op_children) = state.create_block_template("operator_add")?;
-        state.attach_input(&op, &motion, "STEPS", false)?;
-        state.set_strumber_field(&op_children[0], "12.3")?;
+        // let (op, op_children) = state.create_block_template("operator_add")?;
+        // state.attach_input(&op, &motion, "STEPS", false)?;
+        // state.set_strumber_field(&op_children[0], "12.3")?;
 
-        let (hide, _) = state.create_block_template("looks_hide")?;
-        state.attach_next(&hide, &motion)?;
+        // let (hide, _) = state.create_block_template("looks_hide")?;
+        // state.attach_next(&hide, &motion)?;
 
-        let (show, _) = state.create_block_template("looks_show")?;
-        state.attach_next(&show, &hide)?;
+        // let (show, _) = state.create_block_template("looks_show")?;
+        // state.attach_next(&show, &hide)?;
 
         loop {
             queue!(stdout(), Clear(ClearType::All))?;
-            draw_block(&state, &start, cursor_x, cursor_y)?;
+            // draw_block(&state, &start, cursor_x, cursor_y)?;
+            for top_id in &state.top_level {
+                // if top_id != &start {
+                draw_block(
+                    &state,
+                    top_id,
+                    state.blocks[top_id].x / 50,
+                    state.blocks[top_id].y / 50,
+                )?;
+                // }
+            }
             stdout().flush()?;
             match read()? {
                 crossterm::event::Event::Key(event) => {
@@ -80,10 +90,10 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                 state.save_project("example/output.sb3")?;
                                 break;
                             }
-                            KeyCode::Char('h') => cursor_x -= 1,
-                            KeyCode::Char('j') => cursor_y += 1,
-                            KeyCode::Char('k') => cursor_y -= 1,
-                            KeyCode::Char('l') => cursor_x += 1,
+                            KeyCode::Char('h') => state.scroll_x -= 1,
+                            KeyCode::Char('j') => state.scroll_y += 1,
+                            KeyCode::Char('k') => state.scroll_y -= 1,
+                            KeyCode::Char('l') => state.scroll_x += 1,
                             _ => (),
                         }
                     }

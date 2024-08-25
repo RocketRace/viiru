@@ -104,7 +104,7 @@ pub static BLOCKS: LazyLock<HashMap<String, Spec>> = LazyLock::new(|| {
         ("operator_not".into(),                  spec("<74BE65/FFFFFF>not <OPERAND>")),
         ("operator_join".into(),                 spec("(74BE65/FFFFFF)join (STRING1=\"apple\") (STRING2=\"banana\")")),
         ("operator_letter_of".into(),            spec("(74BE65/FFFFFF)letter (LETTER=1.0) of (STRING=\"apple\")")),
-        ("operator_length".into(),               spec("(74BE65/FFFFFF)length o f(STRING=\"apple\")")),
+        ("operator_length".into(),               spec("(74BE65/FFFFFF)length of (STRING=\"apple\")")),
         ("operator_contains".into(),             spec("{74BE65/FFFFFF}(STRING1=\"apple\") contains (STRING2=\"a\")?")),
         ("operator_mod".into(),                  spec("(74BE65/FFFFFF)(NUM1=@) mod (NUM2=@)")),
         ("operator_round".into(),                spec("(74BE65/FFFFFF)round (NUM=@)")),
