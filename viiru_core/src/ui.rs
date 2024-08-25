@@ -304,23 +304,20 @@ pub fn draw_viewport_border(runtime: &Runtime) -> ViiruResult<()> {
 
 pub fn draw_cursor_lines(runtime: &Runtime) -> ViiruResult<()> {
     let vp = &runtime.viewport;
-    queue!(
-        stdout(),
-        MoveTo(
-            vp.x_min as u16,
-            (runtime.cursor_y - runtime.scroll_y) as u16
-        ),
-        Print("-".repeat((vp.x_max - vp.x_min) as usize)),
-    )?;
-    queue!(
-        stdout(),
-        MoveTo(
-            (runtime.cursor_x - runtime.scroll_x) as u16,
-            vp.y_min as u16
-        )
-    )?;
-    for _ in vp.y_min..vp.y_max {
-        queue!(stdout(), Print("|"), MoveDown(1), MoveLeft(1))?;
+    let screen_x = runtime.cursor_x - runtime.scroll_x;
+    let screen_y = runtime.cursor_y - runtime.scroll_y;
+    if vp.y_min <= screen_y && screen_y < vp.y_max {
+        queue!(
+            stdout(),
+            MoveTo(vp.x_min as u16, screen_y as u16),
+            Print("-".repeat((vp.x_max - vp.x_min) as usize)),
+        )?;
+    }
+    if vp.x_min <= screen_x && screen_x < vp.x_max {
+        queue!(stdout(), MoveTo(screen_x as u16, vp.y_min as u16))?;
+        for _ in vp.y_min..vp.y_max {
+            queue!(stdout(), Print("|"), MoveDown(1), MoveLeft(1))?;
+        }
     }
     Ok(())
 }

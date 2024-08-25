@@ -51,6 +51,10 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         runtime.viewport.y_min = viewport_offset_y;
         runtime.viewport.y_max = rows as i32 - 5;
 
+        // center the view on 0, 0
+        runtime.scroll_x -= (runtime.viewport.x_max - runtime.viewport.x_min) / 2;
+        runtime.scroll_y -= (runtime.viewport.y_max - runtime.viewport.y_min) / 2;
+
         // let (start, _) = state.create_block_template("event_whenflagclicked")?;
 
         // let (iff, _) = state.create_block_template("control_if_else")?;
