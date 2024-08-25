@@ -76,7 +76,7 @@ pub fn print_in_view(
 
 /// returns either dx or dy depending on the block shape (expression or stack)
 pub fn draw_block(runtime: &Runtime, block_id: &str, x: i32, y: i32) -> ViiruResult<i32> {
-    let block = runtime.blocks.get(block_id).unwrap();
+    let block = &runtime.blocks[block_id];
     let spec = &BLOCKS[&block.opcode];
     let mut max_width = 0;
     let mut dx = 0;
@@ -121,7 +121,8 @@ pub fn draw_block(runtime: &Runtime, block_id: &str, x: i32, y: i32) -> ViiruRes
     let mut skip_padding = false;
     for line in &spec.lines {
         print_in_view(runtime, x, y + dy, delimeters.0, block_colors)?;
-        dx += delimeters.0.chars().count() as i32;
+        let d_count = delimeters.0.chars().count();
+        dx += d_count as i32;
         max_width = max_width.max(dx);
         for frag in line {
             match frag {

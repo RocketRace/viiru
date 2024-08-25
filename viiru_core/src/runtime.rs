@@ -29,6 +29,7 @@ pub struct Runtime<'js, 'a> {
     pub scroll_y: i32,
     pub cursor_x: i32,
     pub cursor_y: i32,
+    pub placement_grid: HashMap<(i32, i32), String>,
     pub blocks: HashMap<String, Block>,
     pub top_level: HashSet<String>,
     pub variables: HashMap<String, String>,
@@ -39,8 +40,9 @@ pub struct Runtime<'js, 'a> {
 impl<'js, 'rt> Runtime<'js, 'rt> {
     pub fn new(cx: &'rt mut FunctionContext<'js>, api: Handle<'js, JsObject>) -> Self {
         Runtime {
-            next_usable_id: 0,
             cx,
+            api,
+            next_usable_id: 0,
             viewport: Viewport {
                 x_min: 0,
                 x_max: 0,
@@ -51,12 +53,22 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             scroll_y: 0,
             cursor_x: 0,
             cursor_y: 0,
-            api,
+            placement_grid: HashMap::new(),
             top_level: HashSet::new(),
             blocks: HashMap::new(),
             variables: HashMap::new(),
             lists: HashMap::new(),
             broadcasts: HashMap::new(),
+        }
+    }
+
+    pub fn mark_in_grid(&mut self, x: i32, y: i32, id: &str) {
+        self.placement_grid.insert((x, y), id.to_string());
+    }
+
+    pub fn mark_row_in_grid(&mut self, x: i32, y: i32, width: usize, id: &str) {
+        for i in 0..width {
+            self.mark_in_grid(x + i as i32, y, id);
         }
     }
 
