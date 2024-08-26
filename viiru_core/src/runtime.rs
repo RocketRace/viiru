@@ -211,6 +211,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         if !success {
             return Ok(false);
         }
+        // synchronized + constant
         self.blocks = self.get_all_blocks()?;
         self.top_level = self
             .blocks
@@ -219,10 +220,19 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             .map(|(id, _)| id.clone())
             .collect();
         self.initialize_toolbox_blocks()?;
-        self.cursor_block = None;
         self.variables = self.get_variables_of_type(VariableType::Scalar)?;
         self.lists = self.get_variables_of_type(VariableType::List)?;
         self.broadcasts = self.get_variables_of_type(VariableType::Broadcast)?;
+        // ephemeral
+        self.block_positions.clear();
+        self.cursor_block = None;
+        self.drop_points.clear();
+        self.writable_points.clear();
+        // ui
+        self.scroll_x = 0;
+        self.scroll_y = 0;
+        self.cursor_x = 0;
+        self.cursor_y = 0;
         Ok(true)
     }
 
