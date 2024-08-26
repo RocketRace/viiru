@@ -32,7 +32,8 @@ Then, you can launch the editor: `npm run main`
 
 * Optimize screen drawing routines to minimize flashing
 * Clean up the toolbox, both in terms of implementation and usability. It is currently somewhat hacky 
-  and inconvenient. 
+  and inconvenient.
+* More placement options, e.g. snapping blocks above or in the middle a stack
 * Implement variable and list handling
 * Implement extensions (which includes pen blocks), as well as hidden blocks for compatibility
 * Implement custom blocks
