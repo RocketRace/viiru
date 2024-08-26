@@ -321,14 +321,6 @@ pub fn draw_block(
                         max_width = max_width.max(dx);
                     }
                 }
-                Fragment::AlignmentPoint(substack_name) => {
-                    let connected = block.inputs[substack_name].block_id.is_some();
-                    let s = alignment_point(false, connected, true, true);
-                    print_in_view(runtime, x + dx, y + dy, s, block_colors, true, fake)?;
-                    accumulators.add_grab_row(block_id, x, y + dy, 2);
-                    dx += 2;
-                    max_width = max_width.max(dx);
-                }
                 Fragment::BooleanInput(input_name) => {
                     accumulators.add_drop_point(
                         x + dx,
@@ -378,6 +370,14 @@ pub fn draw_block(
                         dy += stack_height;
                     }
                     skip_padding = true;
+                }
+                Fragment::AlignmentPoint(substack_name) => {
+                    let connected = block.inputs[substack_name].block_id.is_some();
+                    let s = alignment_point(false, connected, true, true);
+                    print_in_view(runtime, x + dx, y + dy, s, block_colors, true, fake)?;
+                    accumulators.add_grab_row(block_id, x, y + dy, 2);
+                    dx += 2;
+                    max_width = max_width.max(dx);
                 }
                 Fragment::Dropdown(field) => {
                     // todo: dropdowns are not implemented
@@ -515,10 +515,12 @@ pub fn draw_block(
         accumulators.add_grab_row(block_id, x, y, max_width);
     }
 
-    accumulators.add_drop_point(x, y + dy, Shape::Stack, block_id, None);
-    if let Some(next_id) = &block.next_id {
-        accumulators.mark_block_offset(next_id, 0, dy);
-        dy += draw_block(runtime, next_id, x, y + dy, accumulators, fake)?;
+    if let Shape::Stack = spec.shape {
+        accumulators.add_drop_point(x, y + dy, Shape::Stack, block_id, None);
+        if let Some(next_id) = &block.next_id {
+            accumulators.mark_block_offset(next_id, 0, dy);
+            dy += draw_block(runtime, next_id, x, y + dy, accumulators, fake)?;
+        }
     }
     queue!(stdout(), ResetColor)?;
 
@@ -749,10 +751,6 @@ pub fn refresh_screen(runtime: &mut Runtime) -> ViiruResult<()> {
         )?;
     }
     runtime.process_accumulators(accumulators);
-    // this must occur after accumulators are processed, i.e. drop points are registered
-    if let Some((parent_id, input_name)) = runtime.current_drop_point() {
-        // todo
-    }
     let position = format!("{},{}", runtime.cursor_x, runtime.cursor_y);
     queue!(
         stdout(),
