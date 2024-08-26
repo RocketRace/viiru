@@ -34,6 +34,7 @@ pub struct Runtime<'js, 'a> {
     next_usable_id: usize,
     cx: &'a mut FunctionContext<'js>,
     api: Handle<'js, JsObject>,
+    pub do_sync: bool,
     // ui
     pub viewport: Viewport,
     pub window_cols: u16,
@@ -74,6 +75,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             next_usable_id: 0,
             window_cols: 0,
             window_rows: 0,
+            do_sync: true,
             viewport: Viewport {
                 x_min: 0,
                 x_max: 0,
@@ -97,13 +99,6 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             lists: HashMap::new(),
             broadcasts: HashMap::new(),
         }
-    }
-
-    pub fn is_in_view(&self, x: i32, y: i32) -> bool {
-        x - self.scroll_x >= self.viewport.x_min
-            && x - self.scroll_x < self.viewport.x_max
-            && y - self.scroll_y >= self.viewport.y_min
-            && y - self.scroll_y < self.viewport.y_max
     }
 
     pub fn move_x(&mut self, dx: i32) -> NeonResult<()> {
@@ -161,6 +156,13 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     pub fn load_project(&mut self, path: &str) -> NeonResult<()> {
         bridge::load_project(self.cx, self.api, path)?;
         self.blocks = self.get_all_blocks()?;
+        self.top_level = self
+            .blocks
+            .iter()
+            .filter(|&(_, block)| block.parent_id.is_none())
+            .map(|(id, _)| id.clone())
+            .collect();
+        self.cursor_block = None;
         self.variables = self.get_variables_of_type(VariableType::Scalar)?;
         self.lists = self.get_variables_of_type(VariableType::List)?;
         self.broadcasts = self.get_variables_of_type(VariableType::Broadcast)?;
@@ -172,13 +174,13 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         Ok(())
     }
 
-    pub fn create_single_block(&mut self, opcode: &str, fake: bool) -> NeonResult<String> {
+    pub fn create_single_block(&mut self, opcode: &str) -> NeonResult<String> {
         let spec = &BLOCKS[opcode];
         let is_shadow = spec.is_shadow;
-        let id = if fake {
-            self.generate_fake_id()
-        } else {
+        let id = if self.do_sync {
             self.generate_id()
+        } else {
+            self.generate_fake_id()
         };
         let inputs: HashMap<_, _> = spec
             .lines
@@ -238,17 +240,15 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         );
         self.top_level.push(id.clone());
         // todo: perhaps we can let the vm generate the ID
-        bridge::create_block(self.cx, self.api, opcode, is_shadow, Some(&id))?;
+        if self.do_sync {
+            bridge::create_block(self.cx, self.api, opcode, is_shadow, Some(&id))?;
+        }
         Ok(id)
     }
 
     // special!
-    pub fn create_block_template(
-        &mut self,
-        opcode: &str,
-        fake: bool,
-    ) -> NeonResult<(String, Vec<String>)> {
-        let id = self.create_single_block(opcode, fake)?;
+    pub fn create_block_template(&mut self, opcode: &str) -> NeonResult<(String, Vec<String>)> {
+        let id = self.create_single_block(opcode)?;
         let spec = &BLOCKS[opcode];
         let mut child_ids = vec![];
         for line in &spec.lines {
@@ -256,21 +256,21 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
                 if let crate::spec::Fragment::StrumberInput(input_name, Some(default)) = frag {
                     let child_id = match default {
                         crate::spec::DefaultValue::Block(child_opcode) => {
-                            self.create_single_block(child_opcode, fake)?
+                            self.create_single_block(child_opcode)?
                         }
                         crate::spec::DefaultValue::Str(s) => {
-                            let text_id = self.create_single_block("text", fake)?;
+                            let text_id = self.create_single_block("text")?;
                             self.set_field(&text_id, "TEXT", s, None)?;
                             text_id
                         }
                         crate::spec::DefaultValue::Num(n, visible) => {
-                            let num_id = self.create_single_block("math_number", fake)?;
+                            let num_id = self.create_single_block("math_number")?;
                             let value = if *visible { &n.to_string() } else { "" };
                             self.set_field(&num_id, "NUM", value, None)?;
                             num_id
                         }
                         crate::spec::DefaultValue::Color((r, g, b)) => {
-                            let color_id = self.create_single_block("colour_picker", fake)?;
+                            let color_id = self.create_single_block("colour_picker")?;
                             let rgb_string = format!("#{r:X}{g:X}{b:X}");
                             self.set_field(&color_id, "COLOUR", &rgb_string, None)?;
                             color_id
@@ -284,34 +284,34 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         Ok((id, child_ids))
     }
 
-    pub fn duplicate_block(&mut self, block_id: &str, is_root: bool) -> ViiruResult<String> {
+    pub fn stamp_block(&mut self, block_id: &str, is_root: bool) -> ViiruResult<String> {
         let original = self.blocks[block_id].clone();
-        let duplicate_id = self.create_single_block(&original.opcode, false)?;
+        let stamp_id = self.create_single_block(&original.opcode)?;
 
         // block sliding is recursive and so only needs to be performed on the root block
         // todo: this doesn't take into account offsets within a block. fix this
         if is_root {
-            self.slide_block_to(&duplicate_id, self.cursor_x, self.cursor_y)?;
+            self.slide_block_to(&stamp_id, self.cursor_x, self.cursor_y)?;
         }
         for (field_name, field) in original.fields {
-            self.set_field(&duplicate_id, &field_name, &field.text, field.id.as_deref())?;
+            self.set_field(&stamp_id, &field_name, &field.text, field.id.as_deref())?;
         }
         if let Some(next_id) = original.next_id {
-            let duplicate_next_id = self.duplicate_block(&next_id, false)?;
-            self.attach_next(&duplicate_next_id, &duplicate_id)?;
+            let stamp_next_id = self.stamp_block(&next_id, false)?;
+            self.attach_next(&stamp_next_id, &stamp_id)?;
         }
         for (input_name, input) in original.inputs {
             if let Some(shadow_id) = input.shadow_id {
-                let duplicate_next_id = self.duplicate_block(&shadow_id, false)?;
-                self.attach_input(&duplicate_next_id, &duplicate_id, &input_name, true)?;
+                let stamp_next_id = self.stamp_block(&shadow_id, false)?;
+                self.attach_input(&stamp_next_id, &stamp_id, &input_name, true)?;
             }
             if let Some(block_id) = input.block_id {
-                let duplicate_next_id = self.duplicate_block(&block_id, false)?;
-                self.attach_input(&duplicate_next_id, &duplicate_id, &input_name, false)?;
+                let stamp_next_id = self.stamp_block(&block_id, false)?;
+                self.attach_input(&stamp_next_id, &stamp_id, &input_name, false)?;
             }
         }
 
-        Ok(duplicate_id)
+        Ok(stamp_id)
     }
 
     fn delete_blocks_recursively(&mut self, id: &str) {
@@ -329,7 +329,9 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     pub fn delete_block(&mut self, id: &str) -> NeonResult<()> {
         self.remove_top_level(id);
         self.delete_blocks_recursively(id);
-        bridge::delete_block(self.cx, self.api, id)?;
+        if self.do_sync {
+            bridge::delete_block(self.cx, self.api, id)?;
+        }
         Ok(())
     }
 
@@ -337,7 +339,9 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         let block = self.blocks.get_mut(id).unwrap();
         block.x += dx;
         block.y += dy;
-        bridge::slide_block(self.cx, self.api, id, block.x, block.y)?;
+        if self.do_sync {
+            bridge::slide_block(self.cx, self.api, id, block.x, block.y)?;
+        }
         for child in block.inputs.clone().values() {
             if let Some(id) = &child.block_id {
                 self.slide_block_by(id, dx, dy)?;
@@ -369,15 +373,16 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         parent.set_input(input_name, id, is_shadow);
         self.blocks.get_mut(id).unwrap().parent_id = Some(parent_id.to_string());
         self.remove_top_level(id);
-
-        bridge::attach_block(
-            self.cx,
-            self.api,
-            id,
-            parent_id,
-            Some(input_name),
-            is_shadow,
-        )?;
+        if self.do_sync {
+            bridge::attach_block(
+                self.cx,
+                self.api,
+                id,
+                parent_id,
+                Some(input_name),
+                is_shadow,
+            )?;
+        }
 
         Ok(())
     }
@@ -395,8 +400,9 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         if let Some(next_id) = old_next_id {
             todo!()
         }
-
-        bridge::attach_block(self.cx, self.api, id, parent_id, None, false)?;
+        if self.do_sync {
+            bridge::attach_block(self.cx, self.api, id, parent_id, None, false)?;
+        }
 
         Ok(())
     }
@@ -423,7 +429,9 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         }
         self.blocks.get_mut(id).unwrap().parent_id = None;
         self.top_level.push(id.to_string());
-        bridge::detach_block(self.cx, self.api, id)?;
+        if self.do_sync {
+            bridge::detach_block(self.cx, self.api, id)?;
+        }
         Ok(())
     }
 
@@ -441,8 +449,9 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         } else {
             block.remove_field_id(field_name);
         }
-
-        bridge::change_field(self.cx, self.api, block_id, field_name, text, data_id)?;
+        if self.do_sync {
+            bridge::change_field(self.cx, self.api, block_id, field_name, text, data_id)?;
+        }
         Ok(())
     }
 

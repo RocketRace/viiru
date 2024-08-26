@@ -42,14 +42,16 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         execute!(stdout(), Clear(ClearType::All))?;
 
         // initialize toolbox
+        runtime.do_sync = false;
         for opcode in OPCODES.iter() {
-            let (id, _) = runtime.create_block_template(opcode, true)?;
+            let (id, _) = runtime.create_block_template(opcode)?;
             runtime.remove_top_level(&id);
             runtime.toolbox.push(id);
         }
+        runtime.do_sync = true;
 
-        let (add, _) = runtime.create_block_template("operator_add", false)?;
-        let (child, _) = runtime.create_block_template("operator_subtract", false)?;
+        let (add, _) = runtime.create_block_template("operator_add")?;
+        let (child, _) = runtime.create_block_template("operator_subtract")?;
         runtime.attach_input(&child, &add, "NUM1", false)?;
 
         let viewport_offset_x = 3;
@@ -245,6 +247,21 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                 }
                                 _ => (),
                             },
+                            KeyCode::Char('s') => match runtime.state {
+                                State::Move => {
+                                    if let Some(a) = runtime
+                                        .placement_grid
+                                        .get(&(runtime.cursor_x, runtime.cursor_y))
+                                    {
+                                        let selected = a.last().unwrap().clone();
+                                        let stamp_id = runtime.stamp_block(&selected, true)?;
+                                        runtime.put_to_cursor(&stamp_id)?;
+                                        needs_refresh = true;
+                                        runtime.state = State::Hold;
+                                    }
+                                }
+                                _ => todo!(),
+                            },
                             KeyCode::Char(' ') => {
                                 // interaction!
                                 match runtime.state {
@@ -267,8 +284,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                     State::Toolbox => {
                                         let toolbox_id =
                                             runtime.toolbox[runtime.toolbox_cursor].clone();
-                                        let spawned_id =
-                                            runtime.duplicate_block(&toolbox_id, true)?;
+                                        let spawned_id = runtime.stamp_block(&toolbox_id, true)?;
                                         runtime.put_to_cursor(&spawned_id)?;
                                         needs_refresh = true;
                                         runtime.state = State::Hold;
