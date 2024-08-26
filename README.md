@@ -1,6 +1,10 @@
-# viiru - terminal editor for scratch blocks
+# viiru - terminal editor for Scratch
+
+Bringing the beloved and intuitive graphical programming language to a text-based and unnatural medium!
 
 (demo video here)
+
+(Terribly sorry for the flickering!)
 
 ## How to run
 
