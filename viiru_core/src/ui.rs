@@ -12,7 +12,7 @@ use crossterm::{
     },
     terminal::{
         disable_raw_mode, enable_raw_mode, Clear, ClearType, EnterAlternateScreen,
-        LeaveAlternateScreen,
+        LeaveAlternateScreen, SetTitle,
     },
 };
 
@@ -29,7 +29,7 @@ pub fn in_terminal_scope<F>(f: F) -> ViiruResult
 where
     F: FnOnce() -> ViiruResult,
 {
-    execute!(stdout(), EnterAlternateScreen, Hide)?;
+    execute!(stdout(), EnterAlternateScreen, Hide, SetTitle("viiru"))?;
     enable_raw_mode()?;
     f()?;
     disable_raw_mode()?;
@@ -37,7 +37,8 @@ where
         stdout(),
         LeaveAlternateScreen,
         SetCursorStyle::DefaultUserShape,
-        Show
+        Show,
+        SetTitle("")
     )?;
     Ok(())
 }
