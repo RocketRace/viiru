@@ -204,6 +204,20 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         }
     }
 
+    pub fn set_viewport(&mut self, columns: u16, rows: u16) {
+        self.window_cols = columns;
+        self.window_rows = columns;
+        self.viewport.x_min = self.viewport_offset_x;
+        self.viewport.x_max = columns as i32 - self.toolbox_width;
+        self.viewport.y_min = self.viewport_offset_y;
+        self.viewport.y_max = rows as i32 - self.status_height;
+    }
+
+    pub fn initialize_scroll(&mut self) {
+        self.scroll_x = -self.viewport_offset_x - self.viewport.width() / 2;
+        self.scroll_y = -self.viewport_offset_y - self.viewport.height() / 2;
+    }
+
     /// be sure to clear the screen afterwards, as this creates some spam from the JS side
     pub fn load_project(&mut self, path: &str) -> NeonResult<bool> {
         // todo: to ensure a proper reset, move self and return a new Runtime
@@ -229,8 +243,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         self.drop_points.clear();
         self.writable_points.clear();
         // ui
-        self.scroll_x = 0;
-        self.scroll_y = 0;
+        self.initialize_scroll();
         self.cursor_x = 0;
         self.cursor_y = 0;
         Ok(true)

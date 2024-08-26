@@ -619,8 +619,8 @@ pub fn draw_marker_dots(runtime: &Runtime) -> ViiruResult<()> {
 
     let dot_color = Colors::new(Color::DarkGrey, Color::Reset);
 
-    for dx in 0..1 + (runtime.viewport.x_max - runtime.viewport.x_min) / x_spacing {
-        for dy in 0..2 + (runtime.viewport.y_max - runtime.viewport.y_min) / y_spacing {
+    for dx in 0..1 + runtime.viewport.width() / x_spacing {
+        for dy in 0..2 + runtime.viewport.height() / y_spacing {
             print_in_view(
                 runtime,
                 x_first + dx * x_spacing,

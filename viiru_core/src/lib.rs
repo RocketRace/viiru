@@ -40,18 +40,8 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
         let WindowSize { columns, rows, .. } = window_size()?;
 
-        runtime.window_cols = columns;
-        runtime.window_rows = columns;
-        runtime.viewport.x_min = runtime.viewport_offset_x;
-        runtime.viewport.x_max = columns as i32 - runtime.toolbox_width;
-        runtime.viewport.y_min = runtime.viewport_offset_y;
-        runtime.viewport.y_max = rows as i32 - runtime.status_height;
-
-        // center the view on 0, 0
-        runtime.scroll_x = -runtime.viewport_offset_x;
-        runtime.scroll_y = -runtime.viewport_offset_y;
-        runtime.scroll_x -= (runtime.viewport.x_max - runtime.viewport.x_min) / 2;
-        runtime.scroll_y -= (runtime.viewport.y_max - runtime.viewport.y_min) / 2;
+        runtime.set_viewport(columns, rows);
+        runtime.initialize_scroll();
 
         refresh_screen(&mut runtime)?;
         let mut needs_refresh = false;
@@ -373,10 +363,12 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                                 } else {
                                                     // todo: support sandwiching
                                                     if runtime.blocks[&parent_id].next_id.is_none()
-                                                        && !runtime.blocks[&parent_id].is_boot()
                                                     {
-                                                        runtime
-                                                            .attach_next(&cursor_id, &parent_id)?;
+                                                        if !runtime.blocks[&parent_id].is_boot() {
+                                                            runtime.attach_next(
+                                                                &cursor_id, &parent_id,
+                                                            )?;
+                                                        }
                                                     } else {
                                                         runtime.status_message =
                                                             "Can't place between stacks yet".into()
@@ -411,12 +403,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                     }
                 }
                 crossterm::event::Event::Resize(new_columns, new_rows) => {
-                    runtime.window_cols = new_columns;
-                    runtime.window_rows = new_rows;
-                    runtime.viewport.x_min = runtime.viewport_offset_x;
-                    runtime.viewport.x_max = new_columns as i32 - runtime.toolbox_width;
-                    runtime.viewport.y_min = runtime.viewport_offset_y;
-                    runtime.viewport.y_max = new_rows as i32 - runtime.status_height;
+                    runtime.set_viewport(new_columns, new_rows);
                     needs_refresh = true;
                 }
                 _ => (),
