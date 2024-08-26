@@ -19,7 +19,6 @@ global.DOMParser = window.DOMParser;
 global.XMLSerializer = window.XMLSerializer;
 global.MouseEvent = window.MouseEvent;
 import SB from 'scratch-blocks';
-// const makeToolboxXML = require("./vendored/make-toolbox-xml");
 // ... uhhhhhhhhh so
 //
 // scratch-blocks contains an UI implementation for the scratch block 
