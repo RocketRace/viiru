@@ -399,10 +399,10 @@ pub fn draw_block(
     }
 
     if let Some(next_id) = &block.next_id {
-        accumulators.add_drop_point(x, y + dy, Shape::Stack, next_id, None);
         dy += draw_block(runtime, next_id, x, y + dy, accumulators, fake)?;
         accumulators.mark_block_offset(next_id, 0, dy);
     }
+    accumulators.add_drop_point(x, y + dy, Shape::Stack, block_id, None);
     queue!(stdout(), ResetColor)?;
 
     if let Shape::Stack = spec.shape {

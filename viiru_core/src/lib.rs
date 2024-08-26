@@ -199,7 +199,8 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                 KeyCode::Char('q') => {
                                     if runtime.is_dirty() {
                                         runtime.status_message =
-                                            "Unsaved changes detected. (Q to force quit)".into()
+                                            "Unsaved changes. (Q to force)".into();
+                                        needs_refresh = true;
                                     } else {
                                         break;
                                     }
@@ -399,8 +400,47 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                             }
                                         }
                                         State::Hold => {
-                                            // TODO: attach to drop-off points
-                                            runtime.cursor_block.take().unwrap();
+                                            if let Some((parent_id, input_name)) =
+                                                runtime.current_drop_point()
+                                            {
+                                                let cursor_id =
+                                                    runtime.cursor_block.take().unwrap();
+                                                if let Some(input_name) = input_name {
+                                                    // chuck existing inputs away to the right somewhere
+                                                    if let Some(existing_id) = runtime.blocks
+                                                        [&parent_id]
+                                                        .inputs[&input_name]
+                                                        .block_id
+                                                        .clone()
+                                                    {
+                                                        runtime.detach_block(&existing_id)?;
+                                                        // TODO: pick a more reasonable position
+                                                        runtime.slide_block_by(
+                                                            &existing_id,
+                                                            1,
+                                                            1,
+                                                        )?;
+                                                    }
+                                                    runtime.attach_input(
+                                                        &cursor_id,
+                                                        &parent_id,
+                                                        &input_name,
+                                                        false,
+                                                    )?;
+                                                } else {
+                                                    // todo: support sandwiching
+                                                    if runtime.blocks[&parent_id].next_id.is_none()
+                                                    {
+                                                        runtime
+                                                            .attach_next(&cursor_id, &parent_id)?;
+                                                    } else {
+                                                        runtime.status_message =
+                                                            "Can't place between stacks yet".into()
+                                                    }
+                                                }
+                                            } else {
+                                                runtime.cursor_block.take().unwrap();
+                                            }
                                             runtime.state = State::Move;
                                         }
                                         State::Toolbox => {

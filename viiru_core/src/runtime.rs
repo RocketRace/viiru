@@ -413,7 +413,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         Ok(())
     }
 
-    pub fn current_drop_point(&self) -> Option<(&str, Option<&str>)> {
+    pub fn current_drop_point(&self) -> Option<(String, Option<String>)> {
         if let Some(cursor_id) = &self.cursor_block {
             let shape = BLOCKS[&self.blocks[cursor_id].opcode].shape;
             // cursor blocks are top-level, so these are up to date
@@ -421,7 +421,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             let y = self.blocks[cursor_id].y;
             if let Some(drop_point) = self.drop_points.get(&(x, y)) {
                 if drop_point.shape == shape {
-                    return Some((&drop_point.id, drop_point.input.as_deref()));
+                    return Some((drop_point.id.clone(), drop_point.input.clone()));
                 }
             }
         }
@@ -456,16 +456,10 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     pub fn attach_next(&mut self, id: &str, parent_id: &str) -> NeonResult<()> {
         let parent = self.blocks.get_mut(parent_id).unwrap();
 
-        let mut old_next_id = Some(id.to_string());
-        std::mem::swap(&mut old_next_id, &mut parent.next_id);
-
+        let old_next_id = parent.next_id.replace(id.to_string());
         self.blocks.get_mut(id).unwrap().parent_id = Some(parent_id.to_string());
         self.remove_top_level(id);
 
-        // TODO handle attaching to the middle of a stack
-        if let Some(next_id) = old_next_id {
-            todo!()
-        }
         if self.do_sync {
             self.is_dirty = true;
             bridge::attach_block(self.cx, self.api, id, parent_id, None, false)?;
