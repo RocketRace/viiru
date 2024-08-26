@@ -109,12 +109,12 @@ pub static BLOCKS: LazyLock<HashMap<String, Spec>> = LazyLock::new(|| {
         ("operator_mod".into(),                  spec("(74BE65/FFFFFF/529244)(NUM1=@) mod (NUM2=@)")),
         ("operator_round".into(),                spec("(74BE65/FFFFFF/529244)round (NUM=@)")),
         ("operator_mathop".into(),               spec("(74BE65/FFFFFF/529244)[OPERATOR] of (NUM=@)")),
-        ("data_variable".into(),                 spec("(F0923C/FFFFFF/FFFFFF)[*VARIABLE]")), // dynamic label (field contains ID)
+        ("data_variable".into(),                 spec("(F0923C/FFFFFF/FFFFFF)[&VARIABLE]")), // dynamic label (field contains ID)
         ("data_setvariableto".into(),            spec("{F0923C/FFFFFF/CD742A}set [VARIABLE] to (VALUE=0.0)")),
         ("data_changevariableby".into(),         spec("{F0923C/FFFFFF/CD742A}change [VARIABLE] by (VALUE=1.0)")),
         ("data_showvariable".into(),             spec("{F0923C/FFFFFF/CD742A}show variable [VARIABLE]")),
         ("data_hidevariable".into(),             spec("{F0923C/FFFFFF/CD742A}hide variable [VARIABLE]")),
-        ("data_listcontents".into(),             spec("(ED7035/FFFFFF/D55825)[*LIST]")), // dynamic label (field contains ID)
+        ("data_listcontents".into(),             spec("(ED7035/FFFFFF/D55825)[&LIST]")), // dynamic label (field contains ID)
         ("data_addtolist".into(),                spec("{ED7035/FFFFFF/D55825}add (ITEM=\"thing\") to [LIST]")),
         ("data_deleteoflist".into(),             spec("{ED7035/FFFFFF/D55825}delete (INDEX=1.0) of [LIST]")),
         ("data_deletealloflist".into(),          spec("{ED7035/FFFFFF/D55825}delete all of [LIST]")),

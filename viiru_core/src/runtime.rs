@@ -165,6 +165,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             .flatten()
             .filter_map(|frag| {
                 if let Fragment::FieldText(field)
+                | Fragment::WritableFieldText(field)
                 | Fragment::CustomColour(field)
                 | Fragment::Dropdown(field) = frag
                 {

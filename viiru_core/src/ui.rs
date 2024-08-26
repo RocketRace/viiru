@@ -160,10 +160,13 @@ pub fn draw_block(
                         shadow_id,
                         block_id: child_id,
                     } = &block.inputs[input_name];
+                    let is_not_covered = child_id.is_none();
                     let topmost = child_id.clone().or(shadow_id.clone());
                     if let Some(input_id) = topmost {
                         let delta = draw_block(runtime, &input_id, x + dx, y + dy, placement_grid)?;
-                        add_row_to_cache(block_id, x + dx, y + dy, delta, placement_grid);
+                        if is_not_covered {
+                            add_row_to_cache(block_id, x + dx, y + dy, delta, placement_grid);
+                        }
                         dx += delta;
                         max_width = max_width.max(dx);
                     } else {
@@ -176,8 +179,6 @@ pub fn draw_block(
                 Fragment::BooleanInput(input_name) => {
                     if let Some(child_id) = &block.inputs[input_name].block_id {
                         let delta = draw_block(runtime, child_id, x + dx, y + dy, placement_grid)?;
-                        add_row_to_cache(block_id, x + dx, y + dy, delta, placement_grid);
-
                         dx += delta;
                         max_width = max_width.max(dx);
                     } else {
@@ -205,6 +206,7 @@ pub fn draw_block(
                     print_in_view(runtime, x + dx, y + dy, &format!("[{field}]"), block_colors)?;
                     let d_count = 2 + field.chars().count() as i32;
                     add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
+                    // TODO: add interactors
                     dx += d_count;
                 }
                 Fragment::Expander => {
@@ -259,6 +261,15 @@ pub fn draw_block(
                     dx += d_count;
                     max_width = max_width.max(dx);
                 }
+                Fragment::WritableFieldText(field) => {
+                    let Field { text, .. } = block.fields.get(field).unwrap();
+                    print_in_view(runtime, x + dx, y + dy, text, block_colors)?;
+                    let d_count = text.chars().count() as i32;
+                    add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
+                    // TODO: add interactors
+                    dx += d_count;
+                    max_width = max_width.max(dx);
+                }
                 Fragment::CustomColour(field) => {
                     let Field {
                         text: rgb_string, ..
@@ -268,6 +279,7 @@ pub fn draw_block(
                     let custom_colours = Colors::new(Color::Reset, Color::Rgb { r, g, b });
                     print_in_view(runtime, x + dx, y + dy, "  ", custom_colours)?;
                     add_row_to_cache(block_id, x + dx, y + dy, 2, placement_grid);
+                    // TODO: add interactors
                     dx += 2;
                     max_width = max_width.max(dx);
                 }
