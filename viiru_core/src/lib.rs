@@ -160,10 +160,13 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                             }
                             KeyCode::Char(' ') => {
                                 // interaction!
-                                if runtime
+                                if let Some(a) = runtime
                                     .placement_grid
-                                    .contains_key(&(runtime.cursor_x, runtime.cursor_y))
+                                    .get(&(runtime.cursor_x, runtime.cursor_y))
                                 {
+                                    let selected = a.last().unwrap();
+                                    let relative_x = runtime.cursor_x - runtime.blocks[selected].x;
+                                    let relative_y = runtime.cursor_y - runtime.blocks[selected].y;
                                     runtime.cursor_x += 1;
                                 }
                                 needs_refresh = true;
