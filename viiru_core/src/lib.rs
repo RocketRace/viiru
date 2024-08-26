@@ -254,8 +254,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                             .get(&(runtime.cursor_x, runtime.cursor_y))
                                         {
                                             let selected = a.last().unwrap().clone();
-                                            runtime.detach_block(&selected)?;
-                                            runtime.cursor_block = Some(selected);
+                                            runtime.put_to_cursor(&selected)?;
                                             needs_refresh = true;
                                             runtime.state = State::Hold;
                                         }
@@ -268,14 +267,9 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                     State::Toolbox => {
                                         let toolbox_id =
                                             runtime.toolbox[runtime.toolbox_cursor].clone();
-                                        let spawned_id = runtime.duplicate_block(
-                                            &toolbox_id,
-                                            runtime.cursor_x,
-                                            runtime.cursor_y,
-                                            true,
-                                        )?;
-                                        runtime.detach_block(&spawned_id)?;
-                                        runtime.cursor_block = Some(spawned_id);
+                                        let spawned_id =
+                                            runtime.duplicate_block(&toolbox_id, true)?;
+                                        runtime.put_to_cursor(&spawned_id)?;
                                         needs_refresh = true;
                                         runtime.state = State::Hold;
                                     }

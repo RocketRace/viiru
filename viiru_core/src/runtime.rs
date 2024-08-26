@@ -122,6 +122,12 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         Ok(())
     }
 
+    pub fn put_to_cursor(&mut self, id: &str) -> NeonResult<()> {
+        self.detach_block(id)?;
+        self.cursor_block = Some(id.to_string());
+        Ok(())
+    }
+
     pub fn generate_id(&mut self) -> String {
         let mut n = self.next_usable_id;
         let mut id = format!("viiru-{n}");
@@ -278,37 +284,29 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         Ok((id, child_ids))
     }
 
-    pub fn duplicate_block(
-        &mut self,
-        block_id: &str,
-        target_x: i32,
-        target_y: i32,
-        is_root: bool,
-    ) -> ViiruResult<String> {
+    pub fn duplicate_block(&mut self, block_id: &str, is_root: bool) -> ViiruResult<String> {
         let original = self.blocks[block_id].clone();
         let duplicate_id = self.create_single_block(&original.opcode, false)?;
 
         // block sliding is recursive and so only needs to be performed on the root block
-        // todo: is that even correct?
+        // todo: this doesn't take into account offsets within a block. fix this
         if is_root {
-            self.slide_block_to(&duplicate_id, target_x, target_y)?;
+            self.slide_block_to(&duplicate_id, self.cursor_x, self.cursor_y)?;
         }
         for (field_name, field) in original.fields {
             self.set_field(&duplicate_id, &field_name, &field.text, field.id.as_deref())?;
         }
         if let Some(next_id) = original.next_id {
-            let duplicate_next_id = self.duplicate_block(&next_id, target_x, target_y, false)?;
+            let duplicate_next_id = self.duplicate_block(&next_id, false)?;
             self.attach_next(&duplicate_next_id, &duplicate_id)?;
         }
         for (input_name, input) in original.inputs {
             if let Some(shadow_id) = input.shadow_id {
-                let duplicate_next_id =
-                    self.duplicate_block(&shadow_id, target_x, target_y, false)?;
+                let duplicate_next_id = self.duplicate_block(&shadow_id, false)?;
                 self.attach_input(&duplicate_next_id, &duplicate_id, &input_name, true)?;
             }
             if let Some(block_id) = input.block_id {
-                let duplicate_next_id =
-                    self.duplicate_block(&block_id, target_x, target_y, false)?;
+                let duplicate_next_id = self.duplicate_block(&block_id, false)?;
                 self.attach_input(&duplicate_next_id, &duplicate_id, &input_name, false)?;
             }
         }
