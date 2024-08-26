@@ -36,7 +36,7 @@ pub struct Runtime<'js, 'a> {
     pub state: State,
     // data
     pub blocks: HashMap<String, Block>,
-    pub top_level: HashSet<String>,
+    pub top_level: Vec<String>,
     pub variables: HashMap<String, String>,
     pub lists: HashMap<String, String>,
     pub broadcasts: HashMap<String, String>,
@@ -70,7 +70,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             placement_grid: HashMap::new(),
             cursor_block: None,
             state: State::Move,
-            top_level: HashSet::new(),
+            top_level: vec![],
             blocks: HashMap::new(),
             variables: HashMap::new(),
             lists: HashMap::new(),
@@ -190,7 +190,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
                 fields,
             },
         );
-        self.top_level.insert(id.clone());
+        self.top_level.push(id.clone());
         // todo: perhaps we can let the vm generate the ID
         bridge::create_block(self.cx, self.api, opcode, is_shadow, Some(&id))?;
         Ok(id)
@@ -247,7 +247,8 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     }
 
     pub fn delete_block(&mut self, id: &str) -> NeonResult<()> {
-        self.top_level.remove(id);
+        let i = self.top_level.iter().position(|p| p == id).unwrap();
+        self.top_level.remove(i);
         self.delete_blocks_recursively(id);
         bridge::delete_block(self.cx, self.api, id)?;
         Ok(())
@@ -288,7 +289,8 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         let parent = self.blocks.get_mut(parent_id).unwrap();
         parent.set_input(input_name, id, is_shadow);
         self.blocks.get_mut(id).unwrap().parent_id = Some(parent_id.to_string());
-        self.top_level.remove(id);
+        let i = self.top_level.iter().position(|p| p == id).unwrap();
+        self.top_level.remove(i);
 
         bridge::attach_block(
             self.cx,
@@ -309,7 +311,8 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         std::mem::swap(&mut old_next_id, &mut parent.next_id);
 
         self.blocks.get_mut(id).unwrap().parent_id = Some(parent_id.to_string());
-        self.top_level.remove(id);
+        let i = self.top_level.iter().position(|p| p == id).unwrap();
+        self.top_level.remove(i);
 
         // TODO handle attaching to the middle of a stack
         if let Some(next_id) = old_next_id {
@@ -342,7 +345,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             parent.remove_input(&input_name, is_shadow);
         }
         self.blocks.get_mut(id).unwrap().parent_id = None;
-        self.top_level.insert(id.to_string());
+        self.top_level.push(id.to_string());
         bridge::detach_block(self.cx, self.api, id)?;
         Ok(())
     }
