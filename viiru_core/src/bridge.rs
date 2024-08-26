@@ -74,7 +74,6 @@ pub fn to_block<'js>(
     cx: &mut FunctionContext<'js>,
     object: Handle<'js, JsObject>,
 ) -> NeonResult<Block> {
-    let id = str_value(cx, object, "id")?;
     let opcode = str_value(cx, object, "opcode")?;
     let parent_id = optional_str_value(cx, object, "parent")?;
     let next_id = optional_str_value(cx, object, "next")?;
@@ -106,7 +105,6 @@ pub fn to_block<'js>(
         y: y as i32,
         offset_x: 0,
         offset_y: 0,
-        id,
         opcode,
         parent_id,
         next_id,

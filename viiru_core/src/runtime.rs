@@ -289,7 +289,6 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
                 y: 0,
                 offset_x: 0,
                 offset_y: 0,
-                id: id.clone(),
                 opcode: opcode.to_string(),
                 parent_id: None,
                 next_id: None,
@@ -469,7 +468,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     pub fn attach_next(&mut self, id: &str, parent_id: &str) -> NeonResult<()> {
         let parent = self.blocks.get_mut(parent_id).unwrap();
 
-        let old_next_id = parent.next_id.replace(id.to_string());
+        parent.next_id.replace(id.to_string());
         self.blocks.get_mut(id).unwrap().parent_id = Some(parent_id.to_string());
         self.remove_top_level(id);
 

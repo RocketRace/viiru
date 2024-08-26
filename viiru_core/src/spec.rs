@@ -41,7 +41,6 @@ pub enum Fragment {
     WritableFieldText(String),
     FieldText(String),
     CustomColour(String),
-    CustomBlock(Vec<()>),
 }
 
 #[derive(Debug, Clone)]

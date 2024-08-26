@@ -233,19 +233,6 @@ pub fn draw_block(
         },
     );
 
-    let inactive_colors = Colors::new(
-        Color::Rgb {
-            r: spec.alt_color.0,
-            g: spec.alt_color.1,
-            b: spec.alt_color.2,
-        },
-        Color::Rgb {
-            r: spec.block_color.0,
-            g: spec.block_color.1,
-            b: spec.block_color.2,
-        },
-    );
-
     if spec.is_hat {
         dy += 1;
     }
@@ -471,7 +458,6 @@ pub fn draw_block(
                     dx += 2;
                     max_width = max_width.max(dx);
                 }
-                Fragment::CustomBlock(custom) => todo!("custom block"),
             }
         }
         if !skip_padding {

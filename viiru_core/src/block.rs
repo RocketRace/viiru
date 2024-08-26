@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 #[derive(Default, Clone)]
 pub struct Block {
-    pub id: String,
     pub x: i32,
     pub y: i32,
     // The offset is calculated automatically while rendering
