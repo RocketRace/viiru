@@ -40,13 +40,18 @@ fn optional_str_value<'js>(
     }
 }
 
-fn num_value<'js>(
+fn optional_num_value_or_zero<'js>(
     cx: &mut FunctionContext<'js>,
     object: Handle<'js, JsObject>,
     key: &str,
 ) -> NeonResult<f64> {
-    let value: Handle<JsNumber> = object.get(cx, key)?;
-    Ok(value.value(cx))
+    let value = object.get_value(cx, key)?;
+    if value.is_a::<JsNumber, _>(cx) {
+        let value: Handle<JsNumber> = value.downcast_or_throw(cx)?;
+        Ok(value.value(cx))
+    } else {
+        Ok(0.0)
+    }
 }
 
 pub fn map_each_value<'js, F, V, R>(
@@ -97,8 +102,8 @@ pub fn to_block<'js>(
     })?;
 
     // 50px per cell
-    let x = num_value(cx, object, "x")? / 50.0;
-    let y = num_value(cx, object, "y")? / 50.0;
+    let x = optional_num_value_or_zero(cx, object, "x")? / 50.0;
+    let y = optional_num_value_or_zero(cx, object, "y")? / 50.0;
 
     Ok(Block {
         x: x as i32,
