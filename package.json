@@ -5,7 +5,7 @@
   "scripts": {
     "main": "npm run build --workspace=viiru_core && ts-node src/index.ts"
   },
-  "license": "MIT",
+  "license": "MPL-2.0",
   "workspaces": [
     "viiru_core"
   ],
