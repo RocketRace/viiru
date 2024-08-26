@@ -261,7 +261,10 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                     }
                                 }
                                 State::Hold => {
-                                    todo!()
+                                    if let Some(cursor_id) = runtime.cursor_block.clone() {
+                                        runtime.stamp_block(&cursor_id, true)?;
+                                        needs_refresh = true;
+                                    }
                                 }
                                 _ => (),
                             },
