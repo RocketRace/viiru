@@ -290,7 +290,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
                 if let Fragment::FieldText(field)
                 | Fragment::WritableFieldText(field)
                 | Fragment::CustomColour(field)
-                | Fragment::Dropdown(field) = frag
+                | Fragment::Dropdown(field, _) = frag
                 {
                     Some((
                         field.clone(),

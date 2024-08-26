@@ -24,6 +24,7 @@ pub struct Spec {
     pub text_color: (u8, u8, u8),
     pub alt_color: (u8, u8, u8),
     pub lines: Vec<Vec<Fragment>>,
+    pub static_dropdown_options: Option<Vec<DropdownOption>>,
 }
 
 #[derive(Debug, Clone)]
@@ -32,7 +33,7 @@ pub enum Fragment {
     StrumberInput(String, Option<DefaultValue>),
     BooleanInput(String),
     BlockInput(String),
-    Dropdown(String),
+    Dropdown(String, Option<Vec<DropdownOption>>),
     Expander,
     AlignmentPoint(String),
     Flag,
@@ -66,10 +67,20 @@ pub fn spec(s: &'static str) -> Spec {
     let text_color = parse_rgb(&header[1 + 6 + 1..1 + 6 + 1 + 6]);
     let alt_color = parse_rgb(&header[1 + 6 + 1 + 6 + 1..1 + 6 + 1 + 6 + 1 + 6]);
 
+    let mut static_dropdown_options = None;
+
     let s = &s[1 + 6 + 1 + 6 + 1 + 6 + 1..];
     let lines: Vec<_> = s
         .lines()
-        .map(|l| parse_line().parse(l.as_bytes()).unwrap())
+        .map(|l| {
+            let line = parse_line().parse(l.as_bytes()).unwrap();
+            for frag in &line {
+                if let Fragment::Dropdown(_, static_options) = frag {
+                    static_dropdown_options = static_options.clone();
+                }
+            }
+            line
+        })
         .collect();
 
     Spec {
@@ -80,6 +91,7 @@ pub fn spec(s: &'static str) -> Spec {
         text_color,
         alt_color,
         lines,
+        static_dropdown_options,
     }
 }
 
@@ -88,7 +100,7 @@ fn id() -> Parser<u8, String> {
 }
 
 fn string() -> Parser<u8, String> {
-    (sym(b'"') * none_of(b"\"").repeat(0..) - sym(b'"')).map(assume_string)
+    (sym(b'`') * none_of(b"`").repeat(0..) - sym(b'`')).map(assume_string)
 }
 
 fn number() -> Parser<u8, f64> {
@@ -108,6 +120,23 @@ fn number() -> Parser<u8, f64> {
     )
 }
 
+#[derive(Debug, Clone)]
+pub struct DropdownOption {
+    pub value: String,
+    pub display: String,
+}
+
+fn static_dropdown_options() -> Parser<u8, Option<Vec<DropdownOption>>> {
+    ((sym(b'/') * id() - sym(b'=') + string())
+        .map(|(value, display)| DropdownOption { value, display })
+        | (sym(b'&') * string()).map(|s| DropdownOption {
+            value: s.clone(),
+            display: s,
+        }))
+    .repeat(0..)
+    .map(|opts| if opts.is_empty() { None } else { Some(opts) })
+}
+
 fn special() -> Parser<u8, Fragment> {
     seq(b"$FLAG").map(|_| Fragment::Flag)
         | seq(b"$CLOCKWISE").map(|_| Fragment::Clockwise)
@@ -116,7 +145,8 @@ fn special() -> Parser<u8, Fragment> {
         | sym(b'(').map(|_| Fragment::Text("(".into()))
         | sym(b'[').map(|_| Fragment::Text("[".into()))
         | sym(b'{').map(|_| Fragment::Text("{".into()))
-        | id().map(Fragment::Dropdown)
+        | (id() + static_dropdown_options())
+            .map(|(field, static_options)| Fragment::Dropdown(field, static_options))
         | (sym(b'&') * id()).map(Fragment::FieldText)
         | (sym(b'*') * id()).map(Fragment::WritableFieldText)
         | (sym(b'#') * id()).map(Fragment::CustomColour)

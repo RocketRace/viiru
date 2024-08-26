@@ -366,7 +366,7 @@ pub fn draw_block(
                     dx += 2;
                     max_width = max_width.max(dx);
                 }
-                Fragment::Dropdown(field) => {
+                Fragment::Dropdown(field, static_options) => {
                     // todo: dropdowns are not implemented
                     print_in_view(
                         runtime,
