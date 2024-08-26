@@ -394,6 +394,21 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         Ok(())
     }
 
+    pub fn current_drop_point(&self) -> Option<(&str, Option<&str>)> {
+        if let Some(cursor_id) = &self.cursor_block {
+            let shape = BLOCKS[&self.blocks[cursor_id].opcode].shape;
+            // cursor blocks are top-level, so these are up to date
+            let x = self.blocks[cursor_id].x;
+            let y = self.blocks[cursor_id].y;
+            if let Some(drop_point) = self.drop_points.get(&(x, y)) {
+                if drop_point.shape == shape {
+                    return Some((&drop_point.id, drop_point.input.as_deref()));
+                }
+            }
+        }
+        None
+    }
+
     pub fn attach_input(
         &mut self,
         id: &str,

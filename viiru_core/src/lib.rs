@@ -21,7 +21,7 @@ use opcodes::TOOLBOX;
 use runtime::{Runtime, State};
 use ui::{
     draw_block, draw_cursor, draw_cursor_lines, draw_marker_dots, draw_toolbox,
-    draw_viewport_border, in_terminal_scope, Accumulators,
+    draw_viewport_border, highlight_cursor_block, in_terminal_scope, Accumulators,
 };
 
 #[neon::main]
@@ -111,6 +111,10 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                 }
                 runtime.process_accumulators(accumulators);
                 draw_cursor(&runtime)?;
+                // this must occur after accumulators are processed, i.e. drop points are registered
+                if let Some((parent_id, input_name)) = runtime.current_drop_point() {
+                    highlight_cursor_block(&runtime)?;
+                }
                 let position = format!("{},{}", runtime.cursor_x, runtime.cursor_y);
                 queue!(
                     stdout(),
@@ -325,6 +329,11 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                             runtime.toolbox[runtime.toolbox_cursor].clone();
                                         let spawned_id = runtime.stamp_block(&toolbox_id, true)?;
                                         runtime.put_to_cursor(&spawned_id)?;
+                                        runtime.slide_block_to(
+                                            &spawned_id,
+                                            runtime.cursor_x,
+                                            runtime.cursor_y,
+                                        )?;
                                         needs_refresh = true;
                                         runtime.state = State::Hold;
                                     }

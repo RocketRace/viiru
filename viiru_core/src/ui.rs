@@ -209,7 +209,13 @@ pub fn draw_block(
                     } = &block.inputs[input_name];
                     let is_not_covered = child_id.is_none();
                     let topmost = child_id.clone().or(shadow_id.clone());
-                    accumulators.add_drop_point(x, y, Shape::Circle, block_id, Some(input_name));
+                    accumulators.add_drop_point(
+                        x + dx,
+                        y + dy,
+                        Shape::Circle,
+                        block_id,
+                        Some(input_name),
+                    );
                     if let Some(input_id) = topmost {
                         let delta =
                             draw_block(runtime, &input_id, x + dx, y + dy, accumulators, fake)?;
@@ -227,7 +233,13 @@ pub fn draw_block(
                     }
                 }
                 Fragment::BooleanInput(input_name) => {
-                    accumulators.add_drop_point(x, y, Shape::Hexagon, block_id, Some(input_name));
+                    accumulators.add_drop_point(
+                        x + dx,
+                        y + dy,
+                        Shape::Hexagon,
+                        block_id,
+                        Some(input_name),
+                    );
                     if let Some(child_id) = &block.inputs[input_name].block_id {
                         let delta =
                             draw_block(runtime, child_id, x + dx, y + dy, accumulators, fake)?;
@@ -242,7 +254,13 @@ pub fn draw_block(
                     }
                 }
                 Fragment::BlockInput(input_name) => {
-                    accumulators.add_drop_point(x, y, Shape::Stack, block_id, Some(input_name));
+                    accumulators.add_drop_point(
+                        x + 1,
+                        y + dy,
+                        Shape::Stack,
+                        block_id,
+                        Some(input_name),
+                    );
                     if let Some(child_id) = &block.inputs[input_name].block_id {
                         // - 1 because we already have 1 cell available
                         let stack_height =
@@ -377,7 +395,7 @@ pub fn draw_block(
     }
 
     if let Some(next_id) = &block.next_id {
-        accumulators.add_drop_point(x, y, Shape::Stack, next_id, None);
+        accumulators.add_drop_point(x, y + dy, Shape::Stack, next_id, None);
         dy += draw_block(runtime, next_id, x, y + dy, accumulators, fake)?;
         accumulators.mark_block_offset(next_id, 0, dy);
     }
@@ -554,6 +572,16 @@ pub fn draw_toolbox(
             runtime.toolbox_visible_max = i;
             break;
         }
+    }
+    Ok(())
+}
+
+pub fn highlight_cursor_block(runtime: &Runtime) -> ViiruResult<()> {
+    if let Some(cursor_id) = &runtime.cursor_block {
+        let x = runtime.blocks[cursor_id].x;
+        let y = runtime.blocks[cursor_id].y;
+        let highlight_colors = Colors::new(Color::Black, Color::White);
+        // todo
     }
     Ok(())
 }
