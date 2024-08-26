@@ -92,10 +92,17 @@ pub fn print_in_view(
     Ok(())
 }
 
+pub struct DropPoint {
+    pub shape: Shape,
+    pub id: String,
+    pub input: Option<String>,
+}
+
 #[derive(Default)]
 pub struct Accumulators {
     pub block_positions: HashMap<(i32, i32), Vec<String>>,
     pub block_offsets: HashMap<String, (i32, i32)>,
+    pub drop_points: HashMap<(i32, i32), DropPoint>,
 }
 
 impl Accumulators {
@@ -110,6 +117,17 @@ impl Accumulators {
 
     pub fn mark_block_offset(&mut self, block_id: &str, dx: i32, dy: i32) {
         self.block_offsets.insert(block_id.to_string(), (dx, dy));
+    }
+
+    pub fn add_drop_point(&mut self, x: i32, y: i32, shape: Shape, id: &str, input: Option<&str>) {
+        self.drop_points.insert(
+            (x, y),
+            DropPoint {
+                shape,
+                id: id.to_string(),
+                input: input.map(|s| s.to_string()),
+            },
+        );
     }
 }
 
@@ -191,11 +209,11 @@ pub fn draw_block(
                     } = &block.inputs[input_name];
                     let is_not_covered = child_id.is_none();
                     let topmost = child_id.clone().or(shadow_id.clone());
+                    accumulators.add_drop_point(x, y, Shape::Circle, block_id, Some(input_name));
                     if let Some(input_id) = topmost {
                         let delta =
                             draw_block(runtime, &input_id, x + dx, y + dy, accumulators, fake)?;
                         accumulators.mark_block_offset(&input_id, dx, dy);
-
                         if is_not_covered {
                             accumulators.add_row_to_cache(block_id, x + dx, y + dy, delta);
                         }
@@ -209,6 +227,7 @@ pub fn draw_block(
                     }
                 }
                 Fragment::BooleanInput(input_name) => {
+                    accumulators.add_drop_point(x, y, Shape::Hexagon, block_id, Some(input_name));
                     if let Some(child_id) = &block.inputs[input_name].block_id {
                         let delta =
                             draw_block(runtime, child_id, x + dx, y + dy, accumulators, fake)?;
@@ -223,6 +242,7 @@ pub fn draw_block(
                     }
                 }
                 Fragment::BlockInput(input_name) => {
+                    accumulators.add_drop_point(x, y, Shape::Stack, block_id, Some(input_name));
                     if let Some(child_id) = &block.inputs[input_name].block_id {
                         // - 1 because we already have 1 cell available
                         let stack_height =
@@ -357,6 +377,7 @@ pub fn draw_block(
     }
 
     if let Some(next_id) = &block.next_id {
+        accumulators.add_drop_point(x, y, Shape::Stack, next_id, None);
         dy += draw_block(runtime, next_id, x, y + dy, accumulators, fake)?;
         accumulators.mark_block_offset(next_id, 0, dy);
     }

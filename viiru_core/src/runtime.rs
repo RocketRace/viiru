@@ -8,7 +8,7 @@ use crate::{
     opcodes::{BLOCKS, NUMBERS_ISH},
     result::{undefined_or_throw, ViiruResult},
     spec::Fragment,
-    ui::Accumulators,
+    ui::{Accumulators, DropPoint},
 };
 
 #[derive(Clone, Copy)]
@@ -36,6 +36,7 @@ pub struct Runtime<'js, 'a> {
     cx: &'a mut FunctionContext<'js>,
     api: Handle<'js, JsObject>,
     pub do_sync: bool,
+    pub state: State,
     // ui
     pub viewport: Viewport,
     pub window_cols: u16,
@@ -44,14 +45,16 @@ pub struct Runtime<'js, 'a> {
     pub scroll_y: i32,
     pub cursor_x: i32,
     pub cursor_y: i32,
-    pub block_positions: HashMap<(i32, i32), Vec<String>>,
-    pub cursor_block: Option<String>,
-    pub state: State,
-    pub toolbox: Vec<String>,
     pub toolbox_cursor: usize,
     pub toolbox_scroll: usize,
     pub toolbox_visible_max: usize,
-    // data
+    // constant data
+    pub toolbox: Vec<String>,
+    // ephemeral data
+    pub block_positions: HashMap<(i32, i32), Vec<String>>,
+    pub cursor_block: Option<String>,
+    pub drop_points: HashMap<(i32, i32), DropPoint>,
+    // synchronized data
     pub blocks: HashMap<String, Block>,
     pub top_level: Vec<String>,
     pub variables: HashMap<String, String>,
@@ -71,31 +74,37 @@ pub enum State {
 impl<'js, 'rt> Runtime<'js, 'rt> {
     pub fn new(cx: &'rt mut FunctionContext<'js>, api: Handle<'js, JsObject>) -> Self {
         Runtime {
+            // internals
             cx,
             api,
             next_usable_id: 0,
-            window_cols: 0,
-            window_rows: 0,
+            state: State::Move,
             do_sync: true,
+            // ui
             viewport: Viewport {
                 x_min: 0,
                 x_max: 0,
                 y_min: 0,
                 y_max: 0,
             },
+            window_cols: 0,
+            window_rows: 0,
             scroll_x: 0,
             scroll_y: 0,
             cursor_x: 0,
             cursor_y: 0,
-            block_positions: HashMap::new(),
-            cursor_block: None,
-            state: State::Move,
-            top_level: vec![],
-            toolbox: vec![],
             toolbox_cursor: 0,
             toolbox_scroll: 0,
             toolbox_visible_max: 0,
+            // constant data
+            toolbox: vec![],
+            // ephemeral data
+            block_positions: HashMap::new(),
+            cursor_block: None,
+            drop_points: HashMap::new(),
+            // synchronized data
             blocks: HashMap::new(),
+            top_level: vec![],
             variables: HashMap::new(),
             lists: HashMap::new(),
             broadcasts: HashMap::new(),
@@ -152,12 +161,9 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     }
 
     pub fn process_accumulators(&mut self, accumulators: Accumulators) {
-        self.process_block_offsets(accumulators.block_offsets);
         self.block_positions = accumulators.block_positions;
-    }
-
-    fn process_block_offsets(&mut self, offsets: HashMap<String, (i32, i32)>) {
-        for (id, (dx, dy)) in offsets {
+        self.drop_points = accumulators.drop_points;
+        for (id, (dx, dy)) in accumulators.block_offsets {
             self.blocks.get_mut(&id).unwrap().offset_x = dx;
             self.blocks.get_mut(&id).unwrap().offset_y = dy;
         }
@@ -173,10 +179,9 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         }
     }
 
-    // These methods are convenient wrappers around the raw `api::*` function calls
-
     /// be sure to clear the screen afterwards, as this creates some spam from the JS side
     pub fn load_project(&mut self, path: &str) -> NeonResult<()> {
+        // todo: to ensure a proper reset, move self and return a new Runtime
         bridge::load_project(self.cx, self.api, path)?;
         self.blocks = self.get_all_blocks()?;
         self.top_level = self

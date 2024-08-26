@@ -74,13 +74,13 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
         let mut needs_refresh = true;
         loop {
+            // TODO: implement some form of culling & per-component refresh
             if needs_refresh {
                 queue!(stdout(), Clear(ClearType::All))?;
                 draw_viewport_border(&runtime)?;
                 draw_marker_dots(&runtime)?;
                 draw_cursor_lines(&runtime)?;
                 let mut accumulators = Accumulators::default();
-                // TODO: implement some form of culling
                 for top_id in &runtime.top_level {
                     // draw the cursor block last so it's always on top
                     let is_cursor = if let Some(cursor_id) = &runtime.cursor_block {
