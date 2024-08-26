@@ -428,7 +428,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             let x = self.blocks[cursor_id].x;
             let y = self.blocks[cursor_id].y;
             if let Some(drop_point) = self.drop_points.get(&(x, y)) {
-                if drop_point.shape == shape {
+                if drop_point.shape == shape && !BLOCKS[&self.blocks[cursor_id].opcode].is_hat {
                     return Some((drop_point.id.clone(), drop_point.input.clone()));
                 }
             }
