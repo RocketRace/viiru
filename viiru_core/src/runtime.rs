@@ -49,6 +49,8 @@ pub struct Runtime<'js, 'a> {
     pub toolbox_cursor: usize,
     pub toolbox_scroll: usize,
     pub toolbox_visible_max: usize,
+    pub last_command: char,
+    pub command_buffer: String,
     // constant data
     pub toolbox: Vec<String>,
     // ephemeral data
@@ -98,6 +100,8 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             toolbox_cursor: 0,
             toolbox_scroll: 0,
             toolbox_visible_max: 0,
+            last_command: ' ',
+            command_buffer: String::new(),
             // constant data
             toolbox: vec![],
             // ephemeral data
