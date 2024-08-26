@@ -2,7 +2,7 @@
 
 Bringing the beloved and intuitive graphical programming language to a text-based and unnatural medium!
 
-https://github.com/RocketRace/viiru/blob/3b3eda28da15c854428e7315be9d25748604c700/assets/demo.mp4
+![demo video](https://github.com/RocketRace/viiru/blob/3b3eda28da15c854428e7315be9d25748604c700/assets/demo.mp4)
 
 (Terribly sorry for the flickering!)
 
