@@ -42,6 +42,7 @@ pub fn print_in_view(
     y: i32,
     text: &str,
     colors: Colors,
+    underline: bool,
     fake: bool,
 ) -> ViiruResult<()> {
     let screen_x = x - runtime.scroll_x;
@@ -58,9 +59,13 @@ pub fn print_in_view(
                 stdout(),
                 MoveTo(screen_x as u16, screen_y as u16),
                 SetColors(colors),
-                Print(chopped)
             )?;
+            if underline {
+                queue!(stdout(), SetAttribute(Attribute::Underlined))?;
+            }
+            queue!(stdout(), Print(chopped))?;
         }
+        queue!(stdout(), SetAttribute(Attribute::NoUnderline))?;
         return Ok(());
     }
     // no point even trying if our starting point is bad
@@ -80,6 +85,9 @@ pub fn print_in_view(
             SetColors(colors)
         )?;
         if !chopped.is_empty() {
+            if underline {
+                queue!(stdout(), SetAttribute(Attribute::Underlined))?;
+            }
             queue!(stdout(), Print(chopped))?;
         }
     } else {
@@ -91,9 +99,13 @@ pub fn print_in_view(
             SetColors(colors),
         )?;
         if !chopped.is_empty() {
+            if underline {
+                queue!(stdout(), SetAttribute(Attribute::Underlined))?;
+            }
             queue!(stdout(), Print(chopped))?;
         }
     }
+    queue!(stdout(), SetAttribute(Attribute::NoUnderline))?;
     Ok(())
 }
 
@@ -236,7 +248,7 @@ pub fn draw_block(
         let is_end = line_number == spec.lines.len() - 1;
         match delimeters {
             Ok((d, _)) => {
-                print_in_view(runtime, x, y + dy, d, block_colors, fake)?;
+                print_in_view(runtime, x, y + dy, d, block_colors, true, fake)?;
                 let d_count = d.chars().count();
                 accumulators.add_row_to_cache(block_id, x, y + dy, d_count as i32);
                 dx += d_count as i32;
@@ -248,6 +260,7 @@ pub fn draw_block(
                     y + dy,
                     alignment_point(top, bottom, is_start, is_end),
                     block_colors,
+                    is_end,
                     fake,
                 )?;
                 accumulators.add_row_to_cache(block_id, x, y + dy, 2);
@@ -258,7 +271,7 @@ pub fn draw_block(
         for frag in line {
             match frag {
                 Fragment::Text(text) => {
-                    print_in_view(runtime, x + dx, y + dy, text, block_colors, fake)?;
+                    print_in_view(runtime, x + dx, y + dy, text, block_colors, true, fake)?;
                     let count = text.chars().count() as i32;
                     accumulators.add_row_to_cache(block_id, x + dx, y + dy, count);
                     dx += count;
@@ -288,7 +301,7 @@ pub fn draw_block(
                         dx += delta;
                         max_width = max_width.max(dx);
                     } else {
-                        print_in_view(runtime, x + dx, y + dy, "()", alt_colors, fake)?;
+                        print_in_view(runtime, x + dx, y + dy, "()", alt_colors, true, fake)?;
                         accumulators.add_row_to_cache(block_id, x + dx, y + dy, 2);
                         dx += 2;
                         max_width = max_width.max(dx);
@@ -297,7 +310,7 @@ pub fn draw_block(
                 Fragment::AlignmentPoint(substack_name) => {
                     let connected = block.inputs[substack_name].block_id.is_some();
                     let s = alignment_point(false, connected, true, true);
-                    print_in_view(runtime, x + dx, y + dy, s, block_colors, fake)?;
+                    print_in_view(runtime, x + dx, y + dy, s, block_colors, true, fake)?;
                     accumulators.add_row_to_cache(block_id, x, y + dy, 2);
                     dx += 2;
                     max_width = max_width.max(dx);
@@ -317,7 +330,7 @@ pub fn draw_block(
                         dx += delta;
                         max_width = max_width.max(dx);
                     } else {
-                        print_in_view(runtime, x + dx, y + dy, "<>", alt_colors, fake)?;
+                        print_in_view(runtime, x + dx, y + dy, "<>", alt_colors, true, fake)?;
                         accumulators.add_row_to_cache(block_id, x + dx, y + dy, 2);
                         dx += 2;
                         max_width = max_width.max(dx);
@@ -337,7 +350,15 @@ pub fn draw_block(
                             draw_block(runtime, child_id, x + 2, y + dy, accumulators, fake)? - 1;
                         accumulators.mark_block_offset(child_id, 2, dy);
                         for y_range in 1..=stack_height {
-                            print_in_view(runtime, x, y + dy + y_range, "| ", block_colors, fake)?;
+                            print_in_view(
+                                runtime,
+                                x,
+                                y + dy + y_range,
+                                "| ",
+                                block_colors,
+                                false,
+                                fake,
+                            )?;
                             accumulators.add_row_to_cache(block_id, x, y + dy + y_range, 2);
                         }
                         dy += stack_height;
@@ -352,6 +373,7 @@ pub fn draw_block(
                         y + dy,
                         &format!("[{field}]"),
                         block_colors,
+                        true,
                         fake,
                     )?;
                     let count = 2 + field.chars().count() as i32;
@@ -367,6 +389,7 @@ pub fn draw_block(
                         // - 1 because we already have the left delimiter
                         &" ".repeat(max_width as usize - 1),
                         block_colors,
+                        true,
                         fake,
                     )?;
                     accumulators.add_row_to_cache(block_id, x + dx, y + dy, max_width - 1);
@@ -387,26 +410,26 @@ pub fn draw_block(
                         },
                     );
                     // todo: ascii equivalent?
-                    print_in_view(runtime, x + dx, y + dy, "▸", flag_color, fake)?;
+                    print_in_view(runtime, x + dx, y + dy, "▸", flag_color, true, fake)?;
                     accumulators.add_row_to_cache(block_id, x + dx, y + dy, 1);
                     dx += 1;
                     max_width = max_width.max(dx);
                 }
                 Fragment::Clockwise => {
-                    print_in_view(runtime, x + dx, y + dy, "↻", block_colors, fake)?;
+                    print_in_view(runtime, x + dx, y + dy, "↻", block_colors, true, fake)?;
                     accumulators.add_row_to_cache(block_id, x + dx, y + dy, 1);
                     dx += 1;
                     max_width = max_width.max(dx);
                 }
                 Fragment::Anticlockwise => {
-                    print_in_view(runtime, x + dx, y + dy, "↺", block_colors, fake)?;
+                    print_in_view(runtime, x + dx, y + dy, "↺", block_colors, true, fake)?;
                     accumulators.add_row_to_cache(block_id, x + dx, y + dy, 1);
                     dx += 1;
                     max_width = max_width.max(dx);
                 }
                 Fragment::FieldText(field) => {
                     let Field { text, .. } = block.fields.get(field).unwrap();
-                    print_in_view(runtime, x + dx, y + dy, text, block_colors, fake)?;
+                    print_in_view(runtime, x + dx, y + dy, text, block_colors, true, fake)?;
                     let count = text.chars().count() as i32;
                     accumulators.add_row_to_cache(block_id, x + dx, y + dy, count);
                     dx += count;
@@ -414,7 +437,7 @@ pub fn draw_block(
                 }
                 Fragment::WritableFieldText(field) => {
                     let Field { text, .. } = block.fields.get(field).unwrap();
-                    print_in_view(runtime, x + dx, y + dy, text, block_colors, fake)?;
+                    print_in_view(runtime, x + dx, y + dy, text, block_colors, true, fake)?;
                     let count = text.chars().count() as i32;
                     accumulators.add_row_to_cache(block_id, x + dx, y + dy, count);
                     // TODO: add interactors
@@ -428,7 +451,7 @@ pub fn draw_block(
                     // #RRGGBB format
                     let (r, g, b) = parse_rgb(&rgb_string[1..]);
                     let custom_colours = Colors::new(Color::Reset, Color::Rgb { r, g, b });
-                    print_in_view(runtime, x + dx, y + dy, "  ", custom_colours, fake)?;
+                    print_in_view(runtime, x + dx, y + dy, "  ", custom_colours, true, fake)?;
                     accumulators.add_row_to_cache(block_id, x + dx, y + dy, 2);
                     // TODO: add interactors
                     dx += 2;
@@ -440,13 +463,13 @@ pub fn draw_block(
         if !skip_padding {
             match delimeters {
                 Ok((_, d)) => {
-                    print_in_view(runtime, x + dx, y + dy, d, block_colors, fake)?;
+                    print_in_view(runtime, x + dx, y + dy, d, block_colors, true, fake)?;
                     let d_count = d.chars().count() as i32;
                     accumulators.add_row_to_cache(block_id, x + dx, y + dy, d_count);
                     dx += d_count;
                 }
                 Err(_) => {
-                    print_in_view(runtime, x + dx, y + dy, " ", block_colors, fake)?;
+                    print_in_view(runtime, x + dx, y + dy, " ", block_colors, true, fake)?;
                     accumulators.add_row_to_cache(block_id, x + dx, y + dy, 1);
                     dx += 1;
                 }
@@ -468,6 +491,7 @@ pub fn draw_block(
             y,
             &" ".repeat(max_width as usize),
             block_colors,
+            false,
             fake,
         )?;
         accumulators.add_row_to_cache(block_id, x, y, max_width);
@@ -571,6 +595,7 @@ pub fn draw_cursor(runtime: &Runtime) -> ViiruResult<()> {
         "",
         cursor_color,
         false,
+        false,
     )?;
     queue!(
         stdout(),
@@ -596,6 +621,7 @@ pub fn draw_marker_dots(runtime: &Runtime) -> ViiruResult<()> {
                 y_first + dy * y_spacing,
                 ".",
                 dot_color,
+                false,
                 false,
             )?;
         }
@@ -642,6 +668,7 @@ pub fn draw_toolbox(
                 offset_y + dy,
                 &i_str,
                 colors,
+                false,
                 true,
             )?;
         }
