@@ -277,7 +277,11 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                     }
                                 }
                                 State::Hold => {
-                                    todo!()
+                                    if let Some(cursor_id) = runtime.cursor_block.take() {
+                                        runtime.delete_block(&cursor_id)?;
+                                        needs_refresh = true;
+                                        runtime.state = State::Move;
+                                    }
                                 }
                                 _ => (),
                             },
