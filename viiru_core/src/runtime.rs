@@ -52,6 +52,7 @@ pub struct Runtime<'js, 'a> {
     pub last_command: char,
     pub command_buffer: String,
     pub status_message: String,
+    pub editing_shadow: String,
     // constant data
     pub viewport_offset_x: i32,
     pub viewport_offset_y: i32,
@@ -109,6 +110,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             last_command: ' ',
             command_buffer: String::new(),
             status_message: String::new(),
+            editing_shadow: String::new(),
             // constant data
             viewport_offset_x: 0,
             viewport_offset_y: 0,
@@ -514,6 +516,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         Ok(())
     }
 
+    // todo: don't panic everywhere
     pub fn set_field(
         &mut self,
         block_id: &str,
@@ -535,6 +538,18 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         Ok(())
     }
 
+    // todo: don't panic everywhere
+    pub fn get_strumber_field(&self, id: &str) -> String {
+        let block = &self.blocks[id];
+        if block.opcode == "text" {
+            block.fields["TEXT"].text.clone()
+        } else if NUMBERS_ISH.contains(&block.opcode.as_str()) {
+            block.fields["NUM"].text.clone()
+        } else {
+            // once again, use the type system please
+            "".into()
+        }
+    }
     pub fn set_strumber_field(&mut self, id: &str, text: &str) -> NeonResult<()> {
         let block = self.blocks.get_mut(id).unwrap();
         if block.opcode == "text" {

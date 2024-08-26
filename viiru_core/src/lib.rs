@@ -110,6 +110,36 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                 _ => (),
                             }
                             needs_refresh = true;
+                        } else if let State::Inline = runtime.state {
+                            // ugly implementation
+                            match event.code {
+                                KeyCode::Enter | KeyCode::Esc => {
+                                    runtime.state = State::Move;
+                                    runtime.status_message = "".into();
+                                    needs_refresh = true;
+                                }
+                                KeyCode::Backspace => {
+                                    let mut field =
+                                        runtime.get_strumber_field(&runtime.editing_shadow);
+                                    field.pop();
+                                    runtime.set_strumber_field(
+                                        &runtime.editing_shadow.clone(),
+                                        &field,
+                                    )?;
+                                    needs_refresh = true;
+                                }
+                                KeyCode::Char(c) => {
+                                    let mut field =
+                                        runtime.get_strumber_field(&runtime.editing_shadow);
+                                    field.push(c);
+                                    runtime.set_strumber_field(
+                                        &runtime.editing_shadow.clone(),
+                                        &field,
+                                    )?;
+                                    needs_refresh = true;
+                                }
+                                _ => (),
+                            }
                         } else {
                             if let KeyCode::Char(c) = event.code {
                                 runtime.last_command = c;
@@ -313,6 +343,14 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                                 runtime.put_to_cursor(&selected)?;
                                                 needs_refresh = true;
                                                 runtime.state = State::Hold;
+                                            } else if let Some(shadow_id) = runtime
+                                                .writable_points
+                                                .get(&(runtime.cursor_x, runtime.cursor_y))
+                                            {
+                                                runtime.editing_shadow = shadow_id.clone();
+                                                runtime.state = State::Inline;
+                                                runtime.status_message = "Editing field".into();
+                                                needs_refresh = true;
                                             }
                                         }
                                         State::Hold => {
