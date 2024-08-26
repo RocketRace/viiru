@@ -43,11 +43,17 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
         for (i, opcode) in OPCODES.iter().enumerate() {
             let (id, _) = runtime.create_block_template(opcode)?;
-            runtime.slide_block(&id, 0, i as i32 * 2)?;
+            runtime.slide_block_to(&id, 0, i as i32 * 2)?;
         }
+
+        let (add, _) = runtime.create_block_template("operator_add")?;
+        let (child, _) = runtime.create_block_template("operator_subtract")?;
+        runtime.attach_input(&child, &add, "NUM1", false)?;
 
         let viewport_offset_x = 3;
         let viewport_offset_y = 3;
+        let toolbar_width = 20;
+        let status_height = 5;
 
         runtime.scroll_x = -viewport_offset_x;
         runtime.scroll_y = -viewport_offset_y;
@@ -55,9 +61,9 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         let WindowSize { columns, rows, .. } = window_size()?;
 
         runtime.viewport.x_min = viewport_offset_x;
-        runtime.viewport.x_max = columns as i32 - 10;
+        runtime.viewport.x_max = columns as i32 - toolbar_width;
         runtime.viewport.y_min = viewport_offset_y;
-        runtime.viewport.y_max = rows as i32 - 5;
+        runtime.viewport.y_max = rows as i32 - status_height;
 
         // center the view on 0, 0
         runtime.scroll_x -= (runtime.viewport.x_max - runtime.viewport.x_min) / 2;

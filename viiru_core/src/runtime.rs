@@ -88,9 +88,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     pub fn move_x(&mut self, dx: i32) -> NeonResult<()> {
         self.cursor_x += dx;
         if let Some(id) = self.cursor_block.clone() {
-            let x = self.blocks[&id].x + dx;
-            let y = self.blocks[&id].y;
-            self.slide_block(&id, x, y)?;
+            self.slide_block_by(&id, dx, 0)?;
         }
         Ok(())
     }
@@ -98,9 +96,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     pub fn move_y(&mut self, dy: i32) -> NeonResult<()> {
         self.cursor_y += dy;
         if let Some(id) = self.cursor_block.clone() {
-            let x = self.blocks[&id].x;
-            let y = self.blocks[&id].y + dy;
-            self.slide_block(&id, x, y)?;
+            self.slide_block_by(&id, 0, dy)?;
         }
         Ok(())
     }
@@ -257,12 +253,28 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         Ok(())
     }
 
-    pub fn slide_block(&mut self, id: &str, x: i32, y: i32) -> NeonResult<()> {
+    pub fn slide_block_by(&mut self, id: &str, dx: i32, dy: i32) -> NeonResult<()> {
         let block = self.blocks.get_mut(id).unwrap();
-        block.x = x;
-        block.y = y;
+        block.x += dx;
+        block.y += dy;
+        bridge::slide_block(self.cx, self.api, id, block.x, block.y)?;
+        for child in block.inputs.clone().values() {
+            if let Some(id) = &child.block_id {
+                self.slide_block_by(id, dx, dy)?;
+            }
+            if let Some(id) = &child.shadow_id {
+                self.slide_block_by(id, dx, dy)?;
+            }
+        }
 
-        bridge::slide_block(self.cx, self.api, id, x, y)?;
+        Ok(())
+    }
+
+    pub fn slide_block_to(&mut self, id: &str, x: i32, y: i32) -> NeonResult<()> {
+        let block = self.blocks.get_mut(id).unwrap();
+        let dx = x - block.x;
+        let dy = y - block.y;
+        self.slide_block_by(id, dx, dy)?;
         Ok(())
     }
 
