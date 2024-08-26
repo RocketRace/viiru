@@ -305,12 +305,12 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
 
     pub fn stamp_block(&mut self, block_id: &str, is_root: bool) -> ViiruResult<String> {
         let original = self.blocks[block_id].clone();
+        let (new_x, new_y) = self.compute_own_xy(block_id);
         let stamp_id = self.create_single_block(&original.opcode)?;
 
         // block sliding is recursive and so only needs to be performed on the root block
-        // todo: this doesn't take into account offsets within a block. fix this
         if is_root {
-            self.slide_block_to(&stamp_id, self.cursor_x, self.cursor_y)?;
+            self.slide_block_to(&stamp_id, new_x, new_y)?;
         }
         for (field_name, field) in original.fields {
             self.set_field(&stamp_id, &field_name, &field.text, field.id.as_deref())?;
