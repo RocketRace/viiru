@@ -1,13 +1,12 @@
 use std::{collections::HashMap, io::stdout};
 
 use crossterm::{
-    cursor::{Hide, MoveDown, MoveLeft, MoveTo, Show},
-    queue,
+    cursor::{Hide, MoveDown, MoveLeft, MoveTo, SetCursorStyle, Show},
+    execute, queue,
     style::{
         Attribute, Color, Colors, Print, ResetColor, SetAttribute, SetColors, SetForegroundColor,
     },
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
 };
 
 use crate::{
@@ -23,11 +22,16 @@ pub fn in_terminal_scope<F>(f: F) -> ViiruResult
 where
     F: FnOnce() -> ViiruResult,
 {
-    stdout().execute(EnterAlternateScreen)?.execute(Hide)?;
+    execute!(stdout(), EnterAlternateScreen, Hide)?;
     enable_raw_mode()?;
     f()?;
     disable_raw_mode()?;
-    stdout().execute(LeaveAlternateScreen)?.execute(Show)?;
+    execute!(
+        stdout(),
+        LeaveAlternateScreen,
+        SetCursorStyle::DefaultUserShape,
+        Show
+    )?;
     Ok(())
 }
 
@@ -456,13 +460,22 @@ pub fn draw_cursor_lines(runtime: &Runtime) -> ViiruResult<()> {
         queue!(
             stdout(),
             MoveTo(vp.x_min as u16, screen_y as u16),
-            Print("-".repeat((vp.x_max - vp.x_min) as usize)),
+            Print("-".repeat((screen_x - vp.x_min) as usize)),
+        )?;
+        queue!(
+            stdout(),
+            MoveTo(screen_x as u16 + 1, screen_y as u16),
+            Print("-".repeat((vp.x_max - screen_x - 1) as usize)),
         )?;
     }
     if vp.x_min <= screen_x && screen_x < vp.x_max {
         queue!(stdout(), MoveTo(screen_x as u16, vp.y_min as u16))?;
-        for _ in vp.y_min..vp.y_max {
-            queue!(stdout(), Print("|"), MoveDown(1), MoveLeft(1))?;
+        for i in vp.y_min..vp.y_max {
+            if i == screen_y {
+                queue!(stdout(), MoveDown(1))?;
+            } else {
+                queue!(stdout(), Print("|"), MoveDown(1), MoveLeft(1))?;
+            }
         }
     }
     Ok(())
@@ -470,12 +483,17 @@ pub fn draw_cursor_lines(runtime: &Runtime) -> ViiruResult<()> {
 
 pub fn draw_cursor(runtime: &Runtime) -> ViiruResult<()> {
     let cursor_color = Colors::new(Color::Black, Color::White);
-    queue!(stdout(), SetAttribute(Attribute::Bold))?;
+    queue!(
+        stdout(),
+        MoveTo(runtime.cursor_x as u16, runtime.cursor_y as u16),
+        Show,
+        SetCursorStyle::SteadyBlock,
+    )?;
     print_in_view(
         runtime,
         runtime.cursor_x,
         runtime.cursor_y,
-        "+",
+        "",
         cursor_color,
         false,
     )?;
