@@ -43,7 +43,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
         for (i, opcode) in OPCODES.iter().enumerate() {
             let (id, _) = runtime.create_block_template(opcode)?;
-            runtime.slide_block(&id, 100, (i as i32) * 100)?;
+            runtime.slide_block(&id, 0, i as i32 * 2)?;
         }
 
         let viewport_offset_x = 3;
@@ -77,8 +77,8 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                     draw_block(
                         &runtime,
                         top_id,
-                        runtime.blocks[top_id].x / 50,
-                        runtime.blocks[top_id].y / 50,
+                        runtime.blocks[top_id].x,
+                        runtime.blocks[top_id].y,
                         &mut placement_grid,
                     )?;
                     // }
@@ -109,7 +109,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                 break;
                             }
                             KeyCode::Char('h') => {
-                                runtime.cursor_x -= 1;
+                                runtime.move_x(-1)?;
                                 if runtime.cursor_x - runtime.scroll_x == runtime.viewport.y_min - 1
                                 {
                                     runtime.scroll_x -= 1;
@@ -117,14 +117,14 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                 needs_refresh = true;
                             }
                             KeyCode::Char('j') => {
-                                runtime.cursor_y += 1;
+                                runtime.move_y(1)?;
                                 if runtime.cursor_y - runtime.scroll_y == runtime.viewport.y_max {
                                     runtime.scroll_y += 1;
                                 }
                                 needs_refresh = true;
                             }
                             KeyCode::Char('k') => {
-                                runtime.cursor_y -= 1;
+                                runtime.move_y(-1)?;
                                 if runtime.cursor_y - runtime.scroll_y == runtime.viewport.y_min - 1
                                 {
                                     runtime.scroll_y -= 1;
@@ -132,7 +132,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                 needs_refresh = true;
                             }
                             KeyCode::Char('l') => {
-                                runtime.cursor_x += 1;
+                                runtime.move_x(1)?;
                                 if runtime.cursor_x - runtime.scroll_x == runtime.viewport.x_max {
                                     runtime.scroll_x += 1;
                                 }
@@ -140,22 +140,22 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                             }
                             KeyCode::Char('H') => {
                                 runtime.scroll_x -= 1;
-                                runtime.cursor_x -= 1;
+                                runtime.move_x(-1)?;
                                 needs_refresh = true;
                             }
                             KeyCode::Char('J') => {
                                 runtime.scroll_y += 1;
-                                runtime.cursor_y += 1;
+                                runtime.move_y(1)?;
                                 needs_refresh = true;
                             }
                             KeyCode::Char('K') => {
                                 runtime.scroll_y -= 1;
-                                runtime.cursor_y -= 1;
+                                runtime.move_y(-1)?;
                                 needs_refresh = true;
                             }
                             KeyCode::Char('L') => {
                                 runtime.scroll_x += 1;
-                                runtime.cursor_x += 1;
+                                runtime.move_x(1)?;
                                 needs_refresh = true;
                             }
                             KeyCode::Char(' ') => {
@@ -164,12 +164,11 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                     .placement_grid
                                     .get(&(runtime.cursor_x, runtime.cursor_y))
                                 {
-                                    let selected = a.last().unwrap();
-                                    let relative_x = runtime.cursor_x - runtime.blocks[selected].x;
-                                    let relative_y = runtime.cursor_y - runtime.blocks[selected].y;
-                                    runtime.cursor_x += 1;
+                                    let selected = a.last().unwrap().clone();
+                                    runtime.detach_block(&selected)?;
+                                    runtime.cursor_block = Some(selected.clone());
+                                    needs_refresh = true;
                                 }
-                                needs_refresh = true;
                             }
                             _ => (),
                         }

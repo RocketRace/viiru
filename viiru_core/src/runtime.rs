@@ -21,15 +21,19 @@ pub struct Viewport {
 }
 
 pub struct Runtime<'js, 'a> {
+    // internals
     next_usable_id: usize,
     cx: &'a mut FunctionContext<'js>,
     api: Handle<'js, JsObject>,
+    // ui
     pub viewport: Viewport,
     pub scroll_x: i32,
     pub scroll_y: i32,
     pub cursor_x: i32,
     pub cursor_y: i32,
     pub placement_grid: HashMap<(i32, i32), Vec<String>>,
+    pub cursor_block: Option<String>,
+    // data
     pub blocks: HashMap<String, Block>,
     pub top_level: HashSet<String>,
     pub variables: HashMap<String, String>,
@@ -54,6 +58,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             cursor_x: 0,
             cursor_y: 0,
             placement_grid: HashMap::new(),
+            cursor_block: None,
             top_level: HashSet::new(),
             blocks: HashMap::new(),
             variables: HashMap::new(),
@@ -67,6 +72,26 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             && x - self.scroll_x < self.viewport.x_max
             && y - self.scroll_y >= self.viewport.y_min
             && y - self.scroll_y < self.viewport.y_max
+    }
+
+    pub fn move_x(&mut self, dx: i32) -> NeonResult<()> {
+        self.cursor_x += dx;
+        if let Some(id) = self.cursor_block.clone() {
+            let x = self.blocks[&id].x + dx;
+            let y = self.blocks[&id].y;
+            self.slide_block(&id, x, y)?;
+        }
+        Ok(())
+    }
+
+    pub fn move_y(&mut self, dy: i32) -> NeonResult<()> {
+        self.cursor_y += dy;
+        if let Some(id) = self.cursor_block.clone() {
+            let x = self.blocks[&id].x;
+            let y = self.blocks[&id].y + dy;
+            self.slide_block(&id, x, y)?;
+        }
+        Ok(())
     }
 
     pub fn generate_id(&mut self) -> String {
@@ -225,7 +250,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         block.x = x;
         block.y = y;
 
-        bridge::slide_block(self.cx, self.api, id, x as f64, y as f64)?;
+        bridge::slide_block(self.cx, self.api, id, x, y)?;
         Ok(())
     }
 

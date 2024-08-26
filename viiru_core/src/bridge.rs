@@ -97,8 +97,9 @@ pub fn to_block<'js>(
         Ok(Field { text, id })
     })?;
 
-    let x = num_value(cx, object, "x")?;
-    let y = num_value(cx, object, "y")?;
+    // 50px per cell
+    let x = num_value(cx, object, "x")? / 50.0;
+    let y = num_value(cx, object, "y")? / 50.0;
 
     Ok(Block {
         x: x as i32,
@@ -188,9 +189,12 @@ pub fn slide_block<'js>(
     cx: &mut FunctionContext<'js>,
     api: Handle<JsObject>,
     id: &str,
-    x: f64,
-    y: f64,
+    x: i32,
+    y: i32,
 ) -> JsResult<'js, JsUndefined> {
+    // 50px per cell
+    let x = x as f64 * 50.0;
+    let y = y as f64 * 50.0;
     let args = args!(cx; cx.string(id), cx.number(x), cx.number(y));
     api_call(cx, api, "slideBlock", args)
 }
