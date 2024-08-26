@@ -294,6 +294,14 @@ pub fn draw_block(
                         max_width = max_width.max(dx);
                     }
                 }
+                Fragment::AlignmentPoint(substack_name) => {
+                    let connected = block.inputs[substack_name].block_id.is_some();
+                    let s = alignment_point(false, connected, true, true);
+                    print_in_view(runtime, x + dx, y + dy, s, block_colors, fake)?;
+                    accumulators.add_row_to_cache(block_id, x, y + dy, 2);
+                    dx += 2;
+                    max_width = max_width.max(dx);
+                }
                 Fragment::BooleanInput(input_name) => {
                     accumulators.add_drop_point(
                         x + dx,

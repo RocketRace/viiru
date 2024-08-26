@@ -34,6 +34,7 @@ pub enum Fragment {
     BlockInput(String),
     Dropdown(String),
     Expander,
+    AlignmentPoint(String),
     Flag,
     Clockwise,
     Anticlockwise,
@@ -120,6 +121,7 @@ fn special() -> Parser<u8, Fragment> {
         | (sym(b'&') * id()).map(Fragment::FieldText)
         | (sym(b'*') * id()).map(Fragment::WritableFieldText)
         | (sym(b'#') * id()).map(Fragment::CustomColour)
+        | (sym(b':') * id()).map(Fragment::AlignmentPoint)
 }
 
 fn default_value() -> Parser<u8, DefaultValue> {
