@@ -53,4 +53,4 @@ Then, you can launch the editor: `npm run main`
 
 ## Acknowledgements
 
-Thank you to taswell and dolphy for being my #1 supporters, even though you had no idea what I was cooking.
+Thank you to taswell and Dolphy for being my #1 supporters, even though you had no idea what I was cooking.
