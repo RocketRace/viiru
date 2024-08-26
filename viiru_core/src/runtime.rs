@@ -327,8 +327,10 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     }
 
     pub fn delete_block(&mut self, id: &str) -> NeonResult<()> {
+        self.detach_block(id)?;
         self.remove_top_level(id);
         self.delete_blocks_recursively(id);
+        // The VM handles recursion.
         if self.do_sync {
             bridge::delete_block(self.cx, self.api, id)?;
         }
@@ -383,7 +385,6 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
                 is_shadow,
             )?;
         }
-
         Ok(())
     }
 
@@ -426,9 +427,9 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
                 .next()
                 .unwrap();
             parent.remove_input(&input_name, is_shadow);
+            self.top_level.push(id.to_string());
         }
         self.blocks.get_mut(id).unwrap().parent_id = None;
-        self.top_level.push(id.to_string());
         if self.do_sync {
             bridge::detach_block(self.cx, self.api, id)?;
         }

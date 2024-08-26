@@ -260,7 +260,26 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                         runtime.state = State::Hold;
                                     }
                                 }
-                                _ => todo!(),
+                                State::Hold => {
+                                    todo!()
+                                }
+                                _ => (),
+                            },
+                            KeyCode::Char('D') => match runtime.state {
+                                State::Move => {
+                                    if let Some(a) = runtime
+                                        .placement_grid
+                                        .get(&(runtime.cursor_x, runtime.cursor_y))
+                                    {
+                                        let selected = a.last().unwrap().clone();
+                                        runtime.delete_block(&selected)?;
+                                        needs_refresh = true;
+                                    }
+                                }
+                                State::Hold => {
+                                    todo!()
+                                }
+                                _ => (),
                             },
                             KeyCode::Char(' ') => {
                                 // interaction!
