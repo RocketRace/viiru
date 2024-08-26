@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use neon::prelude::*;
 
@@ -20,6 +20,15 @@ pub struct Viewport {
     pub y_max: i32,
 }
 
+impl Viewport {
+    pub fn width(&self) -> i32 {
+        self.x_max - self.x_min
+    }
+    pub fn height(&self) -> i32 {
+        self.y_max - self.y_min
+    }
+}
+
 pub struct Runtime<'js, 'a> {
     // internals
     next_usable_id: usize,
@@ -27,6 +36,8 @@ pub struct Runtime<'js, 'a> {
     api: Handle<'js, JsObject>,
     // ui
     pub viewport: Viewport,
+    pub window_cols: u16,
+    pub window_rows: u16,
     pub scroll_x: i32,
     pub scroll_y: i32,
     pub cursor_x: i32,
@@ -34,6 +45,8 @@ pub struct Runtime<'js, 'a> {
     pub placement_grid: HashMap<(i32, i32), Vec<String>>,
     pub cursor_block: Option<String>,
     pub state: State,
+    pub toolbox: Vec<String>,
+    pub toolbox_offset: usize,
     // data
     pub blocks: HashMap<String, Block>,
     pub top_level: Vec<String>,
@@ -57,6 +70,8 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             cx,
             api,
             next_usable_id: 0,
+            window_cols: 0,
+            window_rows: 0,
             viewport: Viewport {
                 x_min: 0,
                 x_max: 0,
@@ -71,6 +86,8 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             cursor_block: None,
             state: State::Move,
             top_level: vec![],
+            toolbox: vec![],
+            toolbox_offset: 0,
             blocks: HashMap::new(),
             variables: HashMap::new(),
             lists: HashMap::new(),
@@ -113,6 +130,21 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         id
     }
 
+    fn generate_fake_id(&mut self) -> String {
+        let mut n = usize::MAX;
+        let mut id = format!("viiru-{n}");
+        while self.blocks.contains_key(&id) {
+            n -= 1;
+            id = format!("viiru-{n}");
+        }
+        id
+    }
+
+    pub fn remove_top_level(&mut self, id: &str) {
+        let i = self.top_level.iter().position(|p| p == id).unwrap();
+        self.top_level.remove(i);
+    }
+
     // These methods are convenient wrappers around the raw `api::*` function calls
 
     /// be sure to clear the screen afterwards, as this creates some spam from the JS side
@@ -130,10 +162,14 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         Ok(())
     }
 
-    pub fn create_single_block(&mut self, opcode: &str) -> NeonResult<String> {
+    pub fn create_single_block(&mut self, opcode: &str, fake: bool) -> NeonResult<String> {
         let spec = &BLOCKS[opcode];
         let is_shadow = spec.is_shadow;
-        let id = self.generate_id();
+        let id = if fake {
+            self.generate_fake_id()
+        } else {
+            self.generate_id()
+        };
         let inputs: HashMap<_, _> = spec
             .lines
             .iter()
@@ -197,8 +233,12 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     }
 
     // special!
-    pub fn create_block_template(&mut self, opcode: &str) -> NeonResult<(String, Vec<String>)> {
-        let id = self.create_single_block(opcode)?;
+    pub fn create_block_template(
+        &mut self,
+        opcode: &str,
+        fake: bool,
+    ) -> NeonResult<(String, Vec<String>)> {
+        let id = self.create_single_block(opcode, fake)?;
         let spec = &BLOCKS[opcode];
         let mut child_ids = vec![];
         for line in &spec.lines {
@@ -206,21 +246,21 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
                 if let crate::spec::Fragment::StrumberInput(input_name, Some(default)) = frag {
                     let child_id = match default {
                         crate::spec::DefaultValue::Block(child_opcode) => {
-                            self.create_single_block(child_opcode)?
+                            self.create_single_block(child_opcode, fake)?
                         }
                         crate::spec::DefaultValue::Str(s) => {
-                            let text_id = self.create_single_block("text")?;
+                            let text_id = self.create_single_block("text", fake)?;
                             self.set_field(&text_id, "TEXT", s, None)?;
                             text_id
                         }
                         crate::spec::DefaultValue::Num(n, visible) => {
-                            let num_id = self.create_single_block("math_number")?;
+                            let num_id = self.create_single_block("math_number", fake)?;
                             let value = if *visible { &n.to_string() } else { "" };
                             self.set_field(&num_id, "NUM", value, None)?;
                             num_id
                         }
                         crate::spec::DefaultValue::Color((r, g, b)) => {
-                            let color_id = self.create_single_block("colour_picker")?;
+                            let color_id = self.create_single_block("colour_picker", fake)?;
                             let rgb_string = format!("#{r:X}{g:X}{b:X}");
                             self.set_field(&color_id, "COLOUR", &rgb_string, None)?;
                             color_id
@@ -247,8 +287,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     }
 
     pub fn delete_block(&mut self, id: &str) -> NeonResult<()> {
-        let i = self.top_level.iter().position(|p| p == id).unwrap();
-        self.top_level.remove(i);
+        self.remove_top_level(id);
         self.delete_blocks_recursively(id);
         bridge::delete_block(self.cx, self.api, id)?;
         Ok(())
@@ -289,8 +328,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         let parent = self.blocks.get_mut(parent_id).unwrap();
         parent.set_input(input_name, id, is_shadow);
         self.blocks.get_mut(id).unwrap().parent_id = Some(parent_id.to_string());
-        let i = self.top_level.iter().position(|p| p == id).unwrap();
-        self.top_level.remove(i);
+        self.remove_top_level(id);
 
         bridge::attach_block(
             self.cx,
@@ -311,8 +349,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         std::mem::swap(&mut old_next_id, &mut parent.next_id);
 
         self.blocks.get_mut(id).unwrap().parent_id = Some(parent_id.to_string());
-        let i = self.top_level.iter().position(|p| p == id).unwrap();
-        self.top_level.remove(i);
+        self.remove_top_level(id);
 
         // TODO handle attaching to the middle of a stack
         if let Some(next_id) = old_next_id {

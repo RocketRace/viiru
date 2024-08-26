@@ -23,8 +23,8 @@ use neon::prelude::*;
 use opcodes::OPCODES;
 use runtime::{Runtime, State};
 use ui::{
-    draw_block, draw_cursor, draw_cursor_lines, draw_marker_dots, draw_viewport_border,
-    in_terminal_scope,
+    draw_block, draw_cursor, draw_cursor_lines, draw_marker_dots, draw_toolbox,
+    draw_viewport_border, in_terminal_scope,
 };
 
 #[neon::main]
@@ -41,18 +41,20 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         runtime.load_project("example/empty.sb3")?;
         execute!(stdout(), Clear(ClearType::All))?;
 
-        for (i, opcode) in OPCODES.iter().enumerate() {
-            let (id, _) = runtime.create_block_template(opcode)?;
-            runtime.slide_block_to(&id, 0, i as i32 * 2)?;
+        // initialize toolbox
+        for opcode in OPCODES.iter() {
+            let (id, _) = runtime.create_block_template(opcode, true)?;
+            runtime.remove_top_level(&id);
+            runtime.toolbox.push(id);
         }
 
-        let (add, _) = runtime.create_block_template("operator_add")?;
-        let (child, _) = runtime.create_block_template("operator_subtract")?;
+        let (add, _) = runtime.create_block_template("operator_add", false)?;
+        let (child, _) = runtime.create_block_template("operator_subtract", false)?;
         runtime.attach_input(&child, &add, "NUM1", false)?;
 
         let viewport_offset_x = 3;
-        let viewport_offset_y = 3;
-        let toolbar_width = 20;
+        let viewport_offset_y = 1;
+        let toolbox_width = 45;
         let status_height = 5;
 
         runtime.scroll_x = -viewport_offset_x;
@@ -60,8 +62,10 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
         let WindowSize { columns, rows, .. } = window_size()?;
 
+        runtime.window_cols = columns;
+        runtime.window_rows = columns;
         runtime.viewport.x_min = viewport_offset_x;
-        runtime.viewport.x_max = columns as i32 - toolbar_width;
+        runtime.viewport.x_max = columns as i32 - toolbox_width;
         runtime.viewport.y_min = viewport_offset_y;
         runtime.viewport.y_max = rows as i32 - status_height;
 
@@ -86,6 +90,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                         runtime.blocks[top_id].x,
                         runtime.blocks[top_id].y,
                         &mut placement_grid,
+                        false,
                     )?;
                     // }
                 }
@@ -100,6 +105,8 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                     ),
                     Print(position)
                 )?;
+
+                draw_toolbox(&runtime, viewport_offset_x, viewport_offset_y)?;
 
                 stdout().flush()?;
                 needs_refresh = false;
@@ -218,9 +225,14 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                         }
                     }
                 }
-                crossterm::event::Event::Resize(w, h) => {
-                    runtime.viewport.x_max = w as i32;
-                    runtime.viewport.y_max = h as i32;
+                crossterm::event::Event::Resize(new_columns, new_rows) => {
+                    runtime.window_cols = new_columns;
+                    runtime.window_rows = new_rows;
+                    runtime.viewport.x_min = viewport_offset_x;
+                    runtime.viewport.x_max = new_columns as i32 - toolbox_width;
+                    runtime.viewport.y_min = viewport_offset_y;
+                    runtime.viewport.y_max = new_rows as i32 - status_height;
+                    needs_refresh = true;
                 }
                 _ => (),
             }

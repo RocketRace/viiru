@@ -37,9 +37,27 @@ pub fn print_in_view(
     y: i32,
     text: &str,
     colors: Colors,
+    fake: bool,
 ) -> ViiruResult<()> {
     let screen_x = x - runtime.scroll_x;
     let screen_y = y - runtime.scroll_y;
+    // bypass check for toolbox, only care about going off screen to the right
+    if fake {
+        if screen_x >= runtime.window_cols as i32 {
+            return Ok(());
+        }
+        let visible_chars = runtime.window_cols as i32 - screen_x;
+        let chopped: String = text.chars().take(visible_chars as usize).collect();
+        if !chopped.is_empty() {
+            queue!(
+                stdout(),
+                MoveTo(screen_x as u16, screen_y as u16),
+                SetColors(colors),
+                Print(chopped)
+            )?;
+        }
+        return Ok(());
+    }
     // no point even trying if our starting point is bad
     if screen_y < runtime.viewport.y_min
         || screen_y >= runtime.viewport.y_max
@@ -96,6 +114,7 @@ pub fn draw_block(
     x: i32,
     y: i32,
     placement_grid: &mut HashMap<(i32, i32), Vec<String>>,
+    fake: bool,
 ) -> ViiruResult<i32> {
     let block = &runtime.blocks[block_id];
     let spec = &BLOCKS[&block.opcode];
@@ -141,7 +160,7 @@ pub fn draw_block(
 
     let mut skip_padding = false;
     for line in &spec.lines {
-        print_in_view(runtime, x, y + dy, delimeters.0, block_colors)?;
+        print_in_view(runtime, x, y + dy, delimeters.0, block_colors, fake)?;
         let d_count = delimeters.0.chars().count();
         add_row_to_cache(block_id, x, y + dy, d_count as i32, placement_grid);
         dx += d_count as i32;
@@ -149,7 +168,7 @@ pub fn draw_block(
         for frag in line {
             match frag {
                 Fragment::Text(t) => {
-                    print_in_view(runtime, x + dx, y + dy, t, block_colors)?;
+                    print_in_view(runtime, x + dx, y + dy, t, block_colors, fake)?;
                     let d_count = t.chars().count() as i32;
                     add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
                     dx += d_count;
@@ -163,14 +182,15 @@ pub fn draw_block(
                     let is_not_covered = child_id.is_none();
                     let topmost = child_id.clone().or(shadow_id.clone());
                     if let Some(input_id) = topmost {
-                        let delta = draw_block(runtime, &input_id, x + dx, y + dy, placement_grid)?;
+                        let delta =
+                            draw_block(runtime, &input_id, x + dx, y + dy, placement_grid, fake)?;
                         if is_not_covered {
                             add_row_to_cache(block_id, x + dx, y + dy, delta, placement_grid);
                         }
                         dx += delta;
                         max_width = max_width.max(dx);
                     } else {
-                        print_in_view(runtime, x + dx, y + dy, "()", alt_colors)?;
+                        print_in_view(runtime, x + dx, y + dy, "()", alt_colors, fake)?;
                         add_row_to_cache(block_id, x + dx, y + dy, 2, placement_grid);
                         dx += 2;
                         max_width = max_width.max(dx);
@@ -178,11 +198,12 @@ pub fn draw_block(
                 }
                 Fragment::BooleanInput(input_name) => {
                     if let Some(child_id) = &block.inputs[input_name].block_id {
-                        let delta = draw_block(runtime, child_id, x + dx, y + dy, placement_grid)?;
+                        let delta =
+                            draw_block(runtime, child_id, x + dx, y + dy, placement_grid, fake)?;
                         dx += delta;
                         max_width = max_width.max(dx);
                     } else {
-                        print_in_view(runtime, x + dx, y + dy, "<>", alt_colors)?;
+                        print_in_view(runtime, x + dx, y + dy, "<>", alt_colors, fake)?;
                         add_row_to_cache(block_id, x + dx, y + dy, 2, placement_grid);
                         dx += 2;
                         max_width = max_width.max(dx);
@@ -192,9 +213,9 @@ pub fn draw_block(
                     if let Some(child_id) = &block.inputs[input_name].block_id {
                         // - 1 because we already have 1 cell available
                         let stack_height =
-                            draw_block(runtime, child_id, x + 1, y + dy, placement_grid)? - 1;
+                            draw_block(runtime, child_id, x + 1, y + dy, placement_grid, fake)? - 1;
                         for y_range in 1..=stack_height {
-                            print_in_view(runtime, x, y + dy + y_range, " ", block_colors)?;
+                            print_in_view(runtime, x, y + dy + y_range, " ", block_colors, fake)?;
                             add_row_to_cache(block_id, x, y + dy + y_range, 1, placement_grid);
                         }
                         dy += stack_height;
@@ -203,7 +224,14 @@ pub fn draw_block(
                 }
                 Fragment::Dropdown(field) => {
                     // todo: dropdowns are not implemented
-                    print_in_view(runtime, x + dx, y + dy, &format!("[{field}]"), block_colors)?;
+                    print_in_view(
+                        runtime,
+                        x + dx,
+                        y + dy,
+                        &format!("[{field}]"),
+                        block_colors,
+                        fake,
+                    )?;
                     let d_count = 2 + field.chars().count() as i32;
                     add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
                     // TODO: add interactors
@@ -217,6 +245,7 @@ pub fn draw_block(
                         // - 1 because we already have the left delimiter
                         &" ".repeat(max_width as usize - 1),
                         block_colors,
+                        fake,
                     )?;
                     add_row_to_cache(block_id, x + dx, y + dy, max_width - 1, placement_grid);
                     skip_padding = true;
@@ -236,26 +265,26 @@ pub fn draw_block(
                         },
                     );
                     // todo: ascii equivalent?
-                    print_in_view(runtime, x + dx, y + dy, "▸", flag_color)?;
+                    print_in_view(runtime, x + dx, y + dy, "▸", flag_color, fake)?;
                     add_row_to_cache(block_id, x + dx, y + dy, 1, placement_grid);
                     dx += 1;
                     max_width = max_width.max(dx);
                 }
                 Fragment::Clockwise => {
-                    print_in_view(runtime, x + dx, y + dy, "↻", block_colors)?;
+                    print_in_view(runtime, x + dx, y + dy, "↻", block_colors, fake)?;
                     add_row_to_cache(block_id, x + dx, y + dy, 1, placement_grid);
                     dx += 1;
                     max_width = max_width.max(dx);
                 }
                 Fragment::Anticlockwise => {
-                    print_in_view(runtime, x + dx, y + dy, "↺", block_colors)?;
+                    print_in_view(runtime, x + dx, y + dy, "↺", block_colors, fake)?;
                     add_row_to_cache(block_id, x + dx, y + dy, 1, placement_grid);
                     dx += 1;
                     max_width = max_width.max(dx);
                 }
                 Fragment::FieldText(field) => {
                     let Field { text, .. } = block.fields.get(field).unwrap();
-                    print_in_view(runtime, x + dx, y + dy, text, block_colors)?;
+                    print_in_view(runtime, x + dx, y + dy, text, block_colors, fake)?;
                     let d_count = text.chars().count() as i32;
                     add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
                     dx += d_count;
@@ -263,7 +292,7 @@ pub fn draw_block(
                 }
                 Fragment::WritableFieldText(field) => {
                     let Field { text, .. } = block.fields.get(field).unwrap();
-                    print_in_view(runtime, x + dx, y + dy, text, block_colors)?;
+                    print_in_view(runtime, x + dx, y + dy, text, block_colors, fake)?;
                     let d_count = text.chars().count() as i32;
                     add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
                     // TODO: add interactors
@@ -277,7 +306,7 @@ pub fn draw_block(
                     // #RRGGBB format
                     let (r, g, b) = parse_rgb(&rgb_string[1..]);
                     let custom_colours = Colors::new(Color::Reset, Color::Rgb { r, g, b });
-                    print_in_view(runtime, x + dx, y + dy, "  ", custom_colours)?;
+                    print_in_view(runtime, x + dx, y + dy, "  ", custom_colours, fake)?;
                     add_row_to_cache(block_id, x + dx, y + dy, 2, placement_grid);
                     // TODO: add interactors
                     dx += 2;
@@ -287,7 +316,7 @@ pub fn draw_block(
             }
         }
         if !skip_padding {
-            print_in_view(runtime, x + dx, y + dy, delimeters.1, block_colors)?;
+            print_in_view(runtime, x + dx, y + dy, delimeters.1, block_colors, fake)?;
             let d_count = delimeters.1.chars().count() as i32;
             add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
             dx += d_count;
@@ -302,12 +331,19 @@ pub fn draw_block(
     }
 
     if spec.is_hat {
-        print_in_view(runtime, x, y, &" ".repeat(max_width as usize), block_colors)?;
+        print_in_view(
+            runtime,
+            x,
+            y,
+            &" ".repeat(max_width as usize),
+            block_colors,
+            fake,
+        )?;
         add_row_to_cache(block_id, x, y, max_width, placement_grid);
     }
 
     if let Some(next_id) = &block.next_id {
-        dy += draw_block(runtime, next_id, x, y + dy, placement_grid)?;
+        dy += draw_block(runtime, next_id, x, y + dy, placement_grid, fake)?;
     }
     queue!(stdout(), ResetColor)?;
 
@@ -387,6 +423,7 @@ pub fn draw_cursor(runtime: &Runtime) -> ViiruResult<()> {
         runtime.cursor_y,
         "+",
         cursor_color,
+        false,
     )?;
     queue!(
         stdout(),
@@ -412,10 +449,49 @@ pub fn draw_marker_dots(runtime: &Runtime) -> ViiruResult<()> {
                 y_first + dy * y_spacing,
                 ".",
                 dot_color,
+                false,
             )?;
         }
     }
     queue!(stdout(), ResetColor)?;
 
+    Ok(())
+}
+
+pub fn draw_toolbox(runtime: &Runtime, left_border: i32, top_border: i32) -> ViiruResult<()> {
+    // + 1 for border, + 1 for blank, + 1 for potential cursor, + 2 for numbers, + 1 for blank
+    let offset_x = runtime.scroll_x + left_border + runtime.viewport.width() + 6;
+    let offset_y = runtime.scroll_y + top_border;
+    let mut dy = 0;
+
+    for (i, id) in runtime
+        .toolbox
+        .iter()
+        .enumerate()
+        .skip(runtime.toolbox_offset)
+    {
+        let mut unused = HashMap::new();
+        let shape = BLOCKS[&runtime.blocks[id].opcode].shape;
+        let i_str = i.to_string();
+        let colors = Colors::new(Color::Reset, Color::Reset);
+        print_in_view(
+            runtime,
+            offset_x - 1 - i_str.len() as i32,
+            offset_y + dy,
+            &i_str,
+            colors,
+            true,
+        )?;
+        let delta = draw_block(runtime, id, offset_x, offset_y + dy, &mut unused, true)?;
+        queue!(stdout(), ResetColor)?;
+        if let Shape::Stack = shape {
+            dy += delta;
+        } else {
+            dy += 1;
+        }
+        if dy >= runtime.viewport.height() {
+            break;
+        }
+    }
     Ok(())
 }

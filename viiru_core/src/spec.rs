@@ -8,7 +8,7 @@ use pom::{
 
 use crate::util::{assume_string, parse_rgb};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Shape {
     Circle,
     Hexagon,
