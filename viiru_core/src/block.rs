@@ -5,6 +5,9 @@ pub struct Block {
     pub id: String,
     pub x: i32,
     pub y: i32,
+    // The offset is calculated automatically while rendering
+    pub offset_x: i32,
+    pub offset_y: i32,
     pub opcode: String,
     pub parent_id: Option<String>,
     pub next_id: Option<String>,

@@ -150,6 +150,23 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         self.top_level.remove(i);
     }
 
+    pub fn process_block_offsets(&mut self, offsets: HashMap<String, (i32, i32)>) {
+        for (id, (dx, dy)) in offsets {
+            self.blocks.get_mut(&id).unwrap().offset_x = dx;
+            self.blocks.get_mut(&id).unwrap().offset_y = dy;
+        }
+    }
+
+    pub fn compute_own_xy(&self, block_id: &str) -> (i32, i32) {
+        let block = &self.blocks[block_id];
+        if let Some(parent_id) = &block.parent_id {
+            let (parent_x, parent_y) = self.compute_own_xy(parent_id);
+            (parent_x + block.offset_x, parent_y + block.offset_y)
+        } else {
+            (block.x, block.y)
+        }
+    }
+
     // These methods are convenient wrappers around the raw `api::*` function calls
 
     /// be sure to clear the screen afterwards, as this creates some spam from the JS side
@@ -230,6 +247,8 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             Block {
                 x: 0,
                 y: 0,
+                offset_x: 0,
+                offset_y: 0,
                 id: id.clone(),
                 opcode: opcode.to_string(),
                 parent_id: None,
@@ -409,6 +428,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     }
 
     pub fn detach_block(&mut self, id: &str) -> NeonResult<()> {
+        let (new_x, new_y) = self.compute_own_xy(id);
         let parent_id = self.blocks[id].parent_id.clone();
         if let Some(parent_id) = parent_id {
             let parent = self.blocks.get_mut(&parent_id).unwrap();
@@ -430,6 +450,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             self.top_level.push(id.to_string());
         }
         self.blocks.get_mut(id).unwrap().parent_id = None;
+        self.slide_block_to(id, new_x, new_y)?;
         if self.do_sync {
             bridge::detach_block(self.cx, self.api, id)?;
         }

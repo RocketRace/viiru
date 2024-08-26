@@ -104,6 +104,8 @@ pub fn to_block<'js>(
     Ok(Block {
         x: x as i32,
         y: y as i32,
+        offset_x: 0,
+        offset_y: 0,
         id,
         opcode,
         parent_id,

@@ -84,6 +84,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                 draw_cursor_lines(&runtime)?;
                 // TODO: implement some form of culling
                 let mut placement_grid = HashMap::new();
+                let mut block_offset_mapping = HashMap::new();
                 for top_id in &runtime.top_level {
                     // draw the cursor block last so it's always on top
                     let is_cursor = if let Some(cursor_id) = &runtime.cursor_block {
@@ -98,6 +99,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                             runtime.blocks[top_id].x,
                             runtime.blocks[top_id].y,
                             &mut placement_grid,
+                            &mut block_offset_mapping,
                             false,
                         )?;
                     }
@@ -109,10 +111,12 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                         runtime.blocks[cursor_id].x,
                         runtime.blocks[cursor_id].y,
                         &mut placement_grid,
+                        &mut block_offset_mapping,
                         false,
                     )?;
                 }
                 runtime.placement_grid = placement_grid;
+                runtime.process_block_offsets(block_offset_mapping);
                 draw_cursor(&runtime)?;
                 let position = format!("{},{}", runtime.cursor_x, runtime.cursor_y);
                 queue!(

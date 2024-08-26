@@ -107,6 +107,15 @@ fn add_row_to_cache(
     }
 }
 
+fn mark_block_offset(
+    block_id: &str,
+    dx: i32,
+    dy: i32,
+    offset_mapping: &mut HashMap<String, (i32, i32)>,
+) {
+    offset_mapping.insert(block_id.to_string(), (dx, dy));
+}
+
 /// returns either dx or dy depending on the block shape (expression or stack)
 pub fn draw_block(
     runtime: &Runtime,
@@ -114,6 +123,7 @@ pub fn draw_block(
     x: i32,
     y: i32,
     placement_grid: &mut HashMap<(i32, i32), Vec<String>>,
+    block_offset_mapping: &mut HashMap<String, (i32, i32)>,
     fake: bool,
 ) -> ViiruResult<i32> {
     let block = &runtime.blocks[block_id];
@@ -182,8 +192,17 @@ pub fn draw_block(
                     let is_not_covered = child_id.is_none();
                     let topmost = child_id.clone().or(shadow_id.clone());
                     if let Some(input_id) = topmost {
-                        let delta =
-                            draw_block(runtime, &input_id, x + dx, y + dy, placement_grid, fake)?;
+                        let delta = draw_block(
+                            runtime,
+                            &input_id,
+                            x + dx,
+                            y + dy,
+                            placement_grid,
+                            block_offset_mapping,
+                            fake,
+                        )?;
+                        block_offset_mapping.insert(input_id, (dx, dy));
+
                         if is_not_covered {
                             add_row_to_cache(block_id, x + dx, y + dy, delta, placement_grid);
                         }
@@ -198,8 +217,16 @@ pub fn draw_block(
                 }
                 Fragment::BooleanInput(input_name) => {
                     if let Some(child_id) = &block.inputs[input_name].block_id {
-                        let delta =
-                            draw_block(runtime, child_id, x + dx, y + dy, placement_grid, fake)?;
+                        let delta = draw_block(
+                            runtime,
+                            child_id,
+                            x + dx,
+                            y + dy,
+                            placement_grid,
+                            block_offset_mapping,
+                            fake,
+                        )?;
+                        block_offset_mapping.insert(child_id.to_string(), (dx, dy));
                         dx += delta;
                         max_width = max_width.max(dx);
                     } else {
@@ -212,8 +239,16 @@ pub fn draw_block(
                 Fragment::BlockInput(input_name) => {
                     if let Some(child_id) = &block.inputs[input_name].block_id {
                         // - 1 because we already have 1 cell available
-                        let stack_height =
-                            draw_block(runtime, child_id, x + 1, y + dy, placement_grid, fake)? - 1;
+                        let stack_height = draw_block(
+                            runtime,
+                            child_id,
+                            x + 1,
+                            y + dy,
+                            placement_grid,
+                            block_offset_mapping,
+                            fake,
+                        )? - 1;
+                        block_offset_mapping.insert(child_id.to_string(), (1, dy));
                         for y_range in 1..=stack_height {
                             print_in_view(runtime, x, y + dy + y_range, " ", block_colors, fake)?;
                             add_row_to_cache(block_id, x, y + dy + y_range, 1, placement_grid);
@@ -343,7 +378,16 @@ pub fn draw_block(
     }
 
     if let Some(next_id) = &block.next_id {
-        dy += draw_block(runtime, next_id, x, y + dy, placement_grid, fake)?;
+        dy += draw_block(
+            runtime,
+            next_id,
+            x,
+            y + dy,
+            placement_grid,
+            block_offset_mapping,
+            fake,
+        )?;
+        block_offset_mapping.insert(next_id.to_string(), (0, dy));
     }
     queue!(stdout(), ResetColor)?;
 
@@ -462,7 +506,7 @@ pub fn draw_toolbox(
     runtime: &mut Runtime,
     left_border: i32,
     top_border: i32,
-    // hack: replace this whole system with a proper toolbox viewport
+    // HACK: replace this whole nonsense system with a proper toolbox viewport
     recompute: bool,
 ) -> ViiruResult<()> {
     // + 1 for border, + 1 for blank, + 1 for potential cursor, + 2 for numbers, + 1 for blank
@@ -477,6 +521,7 @@ pub fn draw_toolbox(
         .skip(runtime.toolbox_scroll)
     {
         let mut unused = HashMap::new();
+        let mut unused_2 = HashMap::new();
         let shape = BLOCKS[&runtime.blocks[id].opcode].shape;
         let i_str = if i == runtime.toolbox_cursor {
             if runtime.state == State::Toolbox {
@@ -504,6 +549,7 @@ pub fn draw_toolbox(
             offset_x,
             offset_y + dy,
             &mut unused,
+            &mut unused_2,
             !recompute,
         )?;
         if !recompute {
