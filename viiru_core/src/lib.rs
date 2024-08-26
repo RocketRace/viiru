@@ -7,10 +7,7 @@ mod spec;
 mod ui;
 mod util;
 
-use std::{
-    collections::HashMap,
-    io::{stdout, Write},
-};
+use std::io::{stdout, Write};
 
 use crossterm::{
     cursor::MoveTo,
@@ -20,11 +17,11 @@ use crossterm::{
     terminal::{window_size, Clear, ClearType, WindowSize},
 };
 use neon::prelude::*;
-use opcodes::OPCODES;
+use opcodes::TOOLBOX;
 use runtime::{Runtime, State};
 use ui::{
     draw_block, draw_cursor, draw_cursor_lines, draw_marker_dots, draw_toolbox,
-    draw_viewport_border, in_terminal_scope,
+    draw_viewport_border, in_terminal_scope, Accumulators,
 };
 
 #[neon::main]
@@ -43,7 +40,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
         // initialize toolbox
         runtime.do_sync = false;
-        for opcode in OPCODES.iter() {
+        for opcode in TOOLBOX.iter() {
             let (id, _) = runtime.create_block_template(opcode)?;
             runtime.remove_top_level(&id);
             runtime.toolbox.push(id);
@@ -82,9 +79,8 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                 draw_viewport_border(&runtime)?;
                 draw_marker_dots(&runtime)?;
                 draw_cursor_lines(&runtime)?;
+                let mut accumulators = Accumulators::default();
                 // TODO: implement some form of culling
-                let mut placement_grid = HashMap::new();
-                let mut block_offset_mapping = HashMap::new();
                 for top_id in &runtime.top_level {
                     // draw the cursor block last so it's always on top
                     let is_cursor = if let Some(cursor_id) = &runtime.cursor_block {
@@ -98,8 +94,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                             top_id,
                             runtime.blocks[top_id].x,
                             runtime.blocks[top_id].y,
-                            &mut placement_grid,
-                            &mut block_offset_mapping,
+                            &mut accumulators,
                             false,
                         )?;
                     }
@@ -110,13 +105,11 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                         cursor_id,
                         runtime.blocks[cursor_id].x,
                         runtime.blocks[cursor_id].y,
-                        &mut placement_grid,
-                        &mut block_offset_mapping,
+                        &mut accumulators,
                         false,
                     )?;
                 }
-                runtime.placement_grid = placement_grid;
-                runtime.process_block_offsets(block_offset_mapping);
+                runtime.process_accumulators(accumulators);
                 draw_cursor(&runtime)?;
                 let position = format!("{},{}", runtime.cursor_x, runtime.cursor_y);
                 queue!(
@@ -270,7 +263,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                             KeyCode::Char('s') => match runtime.state {
                                 State::Move => {
                                     if let Some(a) = runtime
-                                        .placement_grid
+                                        .block_positions
                                         .get(&(runtime.cursor_x, runtime.cursor_y))
                                     {
                                         let selected = a.last().unwrap().clone();
@@ -291,7 +284,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                             KeyCode::Char('D') => match runtime.state {
                                 State::Move => {
                                     if let Some(a) = runtime
-                                        .placement_grid
+                                        .block_positions
                                         .get(&(runtime.cursor_x, runtime.cursor_y))
                                     {
                                         let selected = a.last().unwrap().clone();
@@ -313,7 +306,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                 match runtime.state {
                                     State::Move => {
                                         if let Some(a) = runtime
-                                            .placement_grid
+                                            .block_positions
                                             .get(&(runtime.cursor_x, runtime.cursor_y))
                                         {
                                             let selected = a.last().unwrap().clone();

@@ -92,28 +92,25 @@ pub fn print_in_view(
     Ok(())
 }
 
-fn add_row_to_cache(
-    block_id: &str,
-    x: i32,
-    y: i32,
-    width: i32,
-    placement_grid: &mut HashMap<(i32, i32), Vec<String>>,
-) {
-    for i in 0..width {
-        placement_grid
-            .entry((x + i, y))
-            .or_default()
-            .push(block_id.to_string())
-    }
+#[derive(Default)]
+pub struct Accumulators {
+    pub block_positions: HashMap<(i32, i32), Vec<String>>,
+    pub block_offsets: HashMap<String, (i32, i32)>,
 }
 
-fn mark_block_offset(
-    block_id: &str,
-    dx: i32,
-    dy: i32,
-    offset_mapping: &mut HashMap<String, (i32, i32)>,
-) {
-    offset_mapping.insert(block_id.to_string(), (dx, dy));
+impl Accumulators {
+    pub fn add_row_to_cache(&mut self, block_id: &str, x: i32, y: i32, width: i32) {
+        for i in 0..width {
+            self.block_positions
+                .entry((x + i, y))
+                .or_default()
+                .push(block_id.to_string())
+        }
+    }
+
+    pub fn mark_block_offset(&mut self, block_id: &str, dx: i32, dy: i32) {
+        self.block_offsets.insert(block_id.to_string(), (dx, dy));
+    }
 }
 
 /// returns either dx or dy depending on the block shape (expression or stack)
@@ -122,8 +119,11 @@ pub fn draw_block(
     block_id: &str,
     x: i32,
     y: i32,
-    placement_grid: &mut HashMap<(i32, i32), Vec<String>>,
-    block_offset_mapping: &mut HashMap<String, (i32, i32)>,
+    // We pass explicit accumulators instead of taking a &mut Runtime, because
+    // there are a lot of simultaneous accesses that would have to be majorly
+    // refactored otherwise. This is not too costly to do, but culling would
+    // definitely be nice here.
+    accumulators: &mut Accumulators,
     fake: bool,
 ) -> ViiruResult<i32> {
     let block = &runtime.blocks[block_id];
@@ -172,7 +172,7 @@ pub fn draw_block(
     for line in &spec.lines {
         print_in_view(runtime, x, y + dy, delimeters.0, block_colors, fake)?;
         let d_count = delimeters.0.chars().count();
-        add_row_to_cache(block_id, x, y + dy, d_count as i32, placement_grid);
+        accumulators.add_row_to_cache(block_id, x, y + dy, d_count as i32);
         dx += d_count as i32;
         max_width = max_width.max(dx);
         for frag in line {
@@ -180,7 +180,7 @@ pub fn draw_block(
                 Fragment::Text(t) => {
                     print_in_view(runtime, x + dx, y + dy, t, block_colors, fake)?;
                     let d_count = t.chars().count() as i32;
-                    add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
+                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, d_count);
                     dx += d_count;
                     max_width = max_width.max(dx);
                 }
@@ -192,46 +192,32 @@ pub fn draw_block(
                     let is_not_covered = child_id.is_none();
                     let topmost = child_id.clone().or(shadow_id.clone());
                     if let Some(input_id) = topmost {
-                        let delta = draw_block(
-                            runtime,
-                            &input_id,
-                            x + dx,
-                            y + dy,
-                            placement_grid,
-                            block_offset_mapping,
-                            fake,
-                        )?;
-                        block_offset_mapping.insert(input_id, (dx, dy));
+                        let delta =
+                            draw_block(runtime, &input_id, x + dx, y + dy, accumulators, fake)?;
+                        accumulators.mark_block_offset(&input_id, dx, dy);
 
                         if is_not_covered {
-                            add_row_to_cache(block_id, x + dx, y + dy, delta, placement_grid);
+                            accumulators.add_row_to_cache(block_id, x + dx, y + dy, delta);
                         }
                         dx += delta;
                         max_width = max_width.max(dx);
                     } else {
                         print_in_view(runtime, x + dx, y + dy, "()", alt_colors, fake)?;
-                        add_row_to_cache(block_id, x + dx, y + dy, 2, placement_grid);
+                        accumulators.add_row_to_cache(block_id, x + dx, y + dy, 2);
                         dx += 2;
                         max_width = max_width.max(dx);
                     }
                 }
                 Fragment::BooleanInput(input_name) => {
                     if let Some(child_id) = &block.inputs[input_name].block_id {
-                        let delta = draw_block(
-                            runtime,
-                            child_id,
-                            x + dx,
-                            y + dy,
-                            placement_grid,
-                            block_offset_mapping,
-                            fake,
-                        )?;
-                        block_offset_mapping.insert(child_id.to_string(), (dx, dy));
+                        let delta =
+                            draw_block(runtime, child_id, x + dx, y + dy, accumulators, fake)?;
+                        accumulators.mark_block_offset(child_id, dx, dy);
                         dx += delta;
                         max_width = max_width.max(dx);
                     } else {
                         print_in_view(runtime, x + dx, y + dy, "<>", alt_colors, fake)?;
-                        add_row_to_cache(block_id, x + dx, y + dy, 2, placement_grid);
+                        accumulators.add_row_to_cache(block_id, x + dx, y + dy, 2);
                         dx += 2;
                         max_width = max_width.max(dx);
                     }
@@ -239,19 +225,12 @@ pub fn draw_block(
                 Fragment::BlockInput(input_name) => {
                     if let Some(child_id) = &block.inputs[input_name].block_id {
                         // - 1 because we already have 1 cell available
-                        let stack_height = draw_block(
-                            runtime,
-                            child_id,
-                            x + 1,
-                            y + dy,
-                            placement_grid,
-                            block_offset_mapping,
-                            fake,
-                        )? - 1;
-                        block_offset_mapping.insert(child_id.to_string(), (1, dy));
+                        let stack_height =
+                            draw_block(runtime, child_id, x + 1, y + dy, accumulators, fake)? - 1;
+                        accumulators.mark_block_offset(child_id, 1, dy);
                         for y_range in 1..=stack_height {
                             print_in_view(runtime, x, y + dy + y_range, " ", block_colors, fake)?;
-                            add_row_to_cache(block_id, x, y + dy + y_range, 1, placement_grid);
+                            accumulators.add_row_to_cache(block_id, x, y + dy + y_range, 1);
                         }
                         dy += stack_height;
                     }
@@ -268,7 +247,7 @@ pub fn draw_block(
                         fake,
                     )?;
                     let d_count = 2 + field.chars().count() as i32;
-                    add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
+                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, d_count);
                     // TODO: add interactors
                     dx += d_count;
                 }
@@ -282,7 +261,7 @@ pub fn draw_block(
                         block_colors,
                         fake,
                     )?;
-                    add_row_to_cache(block_id, x + dx, y + dy, max_width - 1, placement_grid);
+                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, max_width - 1);
                     skip_padding = true;
                     dx = max_width;
                 }
@@ -301,19 +280,19 @@ pub fn draw_block(
                     );
                     // todo: ascii equivalent?
                     print_in_view(runtime, x + dx, y + dy, "▸", flag_color, fake)?;
-                    add_row_to_cache(block_id, x + dx, y + dy, 1, placement_grid);
+                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, 1);
                     dx += 1;
                     max_width = max_width.max(dx);
                 }
                 Fragment::Clockwise => {
                     print_in_view(runtime, x + dx, y + dy, "↻", block_colors, fake)?;
-                    add_row_to_cache(block_id, x + dx, y + dy, 1, placement_grid);
+                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, 1);
                     dx += 1;
                     max_width = max_width.max(dx);
                 }
                 Fragment::Anticlockwise => {
                     print_in_view(runtime, x + dx, y + dy, "↺", block_colors, fake)?;
-                    add_row_to_cache(block_id, x + dx, y + dy, 1, placement_grid);
+                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, 1);
                     dx += 1;
                     max_width = max_width.max(dx);
                 }
@@ -321,7 +300,7 @@ pub fn draw_block(
                     let Field { text, .. } = block.fields.get(field).unwrap();
                     print_in_view(runtime, x + dx, y + dy, text, block_colors, fake)?;
                     let d_count = text.chars().count() as i32;
-                    add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
+                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, d_count);
                     dx += d_count;
                     max_width = max_width.max(dx);
                 }
@@ -329,7 +308,7 @@ pub fn draw_block(
                     let Field { text, .. } = block.fields.get(field).unwrap();
                     print_in_view(runtime, x + dx, y + dy, text, block_colors, fake)?;
                     let d_count = text.chars().count() as i32;
-                    add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
+                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, d_count);
                     // TODO: add interactors
                     dx += d_count;
                     max_width = max_width.max(dx);
@@ -342,7 +321,7 @@ pub fn draw_block(
                     let (r, g, b) = parse_rgb(&rgb_string[1..]);
                     let custom_colours = Colors::new(Color::Reset, Color::Rgb { r, g, b });
                     print_in_view(runtime, x + dx, y + dy, "  ", custom_colours, fake)?;
-                    add_row_to_cache(block_id, x + dx, y + dy, 2, placement_grid);
+                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, 2);
                     // TODO: add interactors
                     dx += 2;
                     max_width = max_width.max(dx);
@@ -353,7 +332,7 @@ pub fn draw_block(
         if !skip_padding {
             print_in_view(runtime, x + dx, y + dy, delimeters.1, block_colors, fake)?;
             let d_count = delimeters.1.chars().count() as i32;
-            add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
+            accumulators.add_row_to_cache(block_id, x + dx, y + dy, d_count);
             dx += d_count;
             max_width = max_width.max(dx);
         }
@@ -374,20 +353,12 @@ pub fn draw_block(
             block_colors,
             fake,
         )?;
-        add_row_to_cache(block_id, x, y, max_width, placement_grid);
+        accumulators.add_row_to_cache(block_id, x, y, max_width);
     }
 
     if let Some(next_id) = &block.next_id {
-        dy += draw_block(
-            runtime,
-            next_id,
-            x,
-            y + dy,
-            placement_grid,
-            block_offset_mapping,
-            fake,
-        )?;
-        block_offset_mapping.insert(next_id.to_string(), (0, dy));
+        dy += draw_block(runtime, next_id, x, y + dy, accumulators, fake)?;
+        accumulators.mark_block_offset(next_id, 0, dy);
     }
     queue!(stdout(), ResetColor)?;
 
@@ -520,8 +491,7 @@ pub fn draw_toolbox(
         .enumerate()
         .skip(runtime.toolbox_scroll)
     {
-        let mut unused = HashMap::new();
-        let mut unused_2 = HashMap::new();
+        let mut unused = Accumulators::default();
         let shape = BLOCKS[&runtime.blocks[id].opcode].shape;
         let i_str = if i == runtime.toolbox_cursor {
             if runtime.state == State::Toolbox {
@@ -549,7 +519,6 @@ pub fn draw_toolbox(
             offset_x,
             offset_y + dy,
             &mut unused,
-            &mut unused_2,
             !recompute,
         )?;
         if !recompute {

@@ -158,7 +158,7 @@ pub const NUMBERS_ISH: [&str; 5] = [
     "math_angle",
 ];
 
-pub const OPCODES: &[&str] = &[
+pub const TOOLBOX: &[&str] = &[
     "motion_movesteps",
     "motion_turnright",
     "motion_turnleft",

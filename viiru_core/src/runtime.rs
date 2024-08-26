@@ -8,6 +8,7 @@ use crate::{
     opcodes::{BLOCKS, NUMBERS_ISH},
     result::{undefined_or_throw, ViiruResult},
     spec::Fragment,
+    ui::Accumulators,
 };
 
 #[derive(Clone, Copy)]
@@ -43,7 +44,7 @@ pub struct Runtime<'js, 'a> {
     pub scroll_y: i32,
     pub cursor_x: i32,
     pub cursor_y: i32,
-    pub placement_grid: HashMap<(i32, i32), Vec<String>>,
+    pub block_positions: HashMap<(i32, i32), Vec<String>>,
     pub cursor_block: Option<String>,
     pub state: State,
     pub toolbox: Vec<String>,
@@ -86,7 +87,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             scroll_y: 0,
             cursor_x: 0,
             cursor_y: 0,
-            placement_grid: HashMap::new(),
+            block_positions: HashMap::new(),
             cursor_block: None,
             state: State::Move,
             top_level: vec![],
@@ -150,7 +151,12 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         self.top_level.remove(i);
     }
 
-    pub fn process_block_offsets(&mut self, offsets: HashMap<String, (i32, i32)>) {
+    pub fn process_accumulators(&mut self, accumulators: Accumulators) {
+        self.process_block_offsets(accumulators.block_offsets);
+        self.block_positions = accumulators.block_positions;
+    }
+
+    fn process_block_offsets(&mut self, offsets: HashMap<String, (i32, i32)>) {
         for (id, (dx, dy)) in offsets {
             self.blocks.get_mut(&id).unwrap().offset_x = dx;
             self.blocks.get_mut(&id).unwrap().offset_y = dy;
