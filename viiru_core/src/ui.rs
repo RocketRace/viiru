@@ -1,3 +1,4 @@
+use core::str;
 use std::{collections::HashMap, io::stdout};
 
 use crossterm::{
@@ -135,6 +136,32 @@ impl Accumulators {
     }
 }
 
+fn alignment_point(top: bool, bottom: bool, is_start: bool, is_end: bool) -> &'static str {
+    match (is_start, is_end) {
+        (true, true) => match (top, bottom) {
+            (true, true) => "| ",
+            (true, false) => "' ",
+            (false, true) => ". ",
+            (false, false) => "  ",
+        },
+        (true, false) => {
+            if top {
+                "| "
+            } else {
+                ". "
+            }
+        }
+        (false, true) => {
+            if bottom {
+                "| "
+            } else {
+                "' "
+            }
+        }
+        (false, false) => "| ",
+    }
+}
+
 /// returns either dx or dy depending on the block shape (expression or stack)
 pub fn draw_block(
     runtime: &Runtime,
@@ -180,30 +207,61 @@ pub fn draw_block(
         },
     );
 
+    let inactive_colors = Colors::new(
+        Color::Rgb {
+            r: spec.alt_color.0,
+            g: spec.alt_color.1,
+            b: spec.alt_color.2,
+        },
+        Color::Rgb {
+            r: spec.block_color.0,
+            g: spec.block_color.1,
+            b: spec.block_color.2,
+        },
+    );
+
     if spec.is_hat {
         dy += 1;
     }
 
     let delimeters = match spec.shape {
-        Shape::Circle => ("(", ")"),
-        Shape::Hexagon => ("<", ">"),
-        Shape::Stack => (" ", " "),
+        Shape::Circle => Ok(("(", ")")),
+        Shape::Hexagon => Ok(("<", ">")),
+        Shape::Stack => Err((block.parent_id.is_some(), block.next_id.is_some())),
     };
 
     let mut skip_padding = false;
-    for line in &spec.lines {
-        print_in_view(runtime, x, y + dy, delimeters.0, block_colors, fake)?;
-        let d_count = delimeters.0.chars().count();
-        accumulators.add_row_to_cache(block_id, x, y + dy, d_count as i32);
-        dx += d_count as i32;
+    for (line_number, line) in spec.lines.iter().enumerate() {
+        let is_start = line_number == 0;
+        let is_end = line_number == spec.lines.len() - 1;
+        match delimeters {
+            Ok((d, _)) => {
+                print_in_view(runtime, x, y + dy, d, block_colors, fake)?;
+                let d_count = d.chars().count();
+                accumulators.add_row_to_cache(block_id, x, y + dy, d_count as i32);
+                dx += d_count as i32;
+            }
+            Err((top, bottom)) => {
+                print_in_view(
+                    runtime,
+                    x,
+                    y + dy,
+                    alignment_point(top, bottom, is_start, is_end),
+                    block_colors,
+                    fake,
+                )?;
+                accumulators.add_row_to_cache(block_id, x, y + dy, 2);
+                dx += 2;
+            }
+        }
         max_width = max_width.max(dx);
         for frag in line {
             match frag {
-                Fragment::Text(t) => {
-                    print_in_view(runtime, x + dx, y + dy, t, block_colors, fake)?;
-                    let d_count = t.chars().count() as i32;
-                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, d_count);
-                    dx += d_count;
+                Fragment::Text(text) => {
+                    print_in_view(runtime, x + dx, y + dy, text, block_colors, fake)?;
+                    let count = text.chars().count() as i32;
+                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, count);
+                    dx += count;
                     max_width = max_width.max(dx);
                 }
                 Fragment::StrumberInput(input_name, _default) => {
@@ -259,7 +317,7 @@ pub fn draw_block(
                 }
                 Fragment::BlockInput(input_name) => {
                     accumulators.add_drop_point(
-                        x + 1,
+                        x + 2,
                         y + dy,
                         Shape::Stack,
                         block_id,
@@ -268,11 +326,11 @@ pub fn draw_block(
                     if let Some(child_id) = &block.inputs[input_name].block_id {
                         // - 1 because we already have 1 cell available
                         let stack_height =
-                            draw_block(runtime, child_id, x + 1, y + dy, accumulators, fake)? - 1;
-                        accumulators.mark_block_offset(child_id, 1, dy);
+                            draw_block(runtime, child_id, x + 2, y + dy, accumulators, fake)? - 1;
+                        accumulators.mark_block_offset(child_id, 2, dy);
                         for y_range in 1..=stack_height {
-                            print_in_view(runtime, x, y + dy + y_range, " ", block_colors, fake)?;
-                            accumulators.add_row_to_cache(block_id, x, y + dy + y_range, 1);
+                            print_in_view(runtime, x, y + dy + y_range, "| ", block_colors, fake)?;
+                            accumulators.add_row_to_cache(block_id, x, y + dy + y_range, 2);
                         }
                         dy += stack_height;
                     }
@@ -288,10 +346,10 @@ pub fn draw_block(
                         block_colors,
                         fake,
                     )?;
-                    let d_count = 2 + field.chars().count() as i32;
-                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, d_count);
+                    let count = 2 + field.chars().count() as i32;
+                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, count);
                     // TODO: add interactors
-                    dx += d_count;
+                    dx += count;
                 }
                 Fragment::Expander => {
                     print_in_view(
@@ -341,18 +399,18 @@ pub fn draw_block(
                 Fragment::FieldText(field) => {
                     let Field { text, .. } = block.fields.get(field).unwrap();
                     print_in_view(runtime, x + dx, y + dy, text, block_colors, fake)?;
-                    let d_count = text.chars().count() as i32;
-                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, d_count);
-                    dx += d_count;
+                    let count = text.chars().count() as i32;
+                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, count);
+                    dx += count;
                     max_width = max_width.max(dx);
                 }
                 Fragment::WritableFieldText(field) => {
                     let Field { text, .. } = block.fields.get(field).unwrap();
                     print_in_view(runtime, x + dx, y + dy, text, block_colors, fake)?;
-                    let d_count = text.chars().count() as i32;
-                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, d_count);
+                    let count = text.chars().count() as i32;
+                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, count);
                     // TODO: add interactors
-                    dx += d_count;
+                    dx += count;
                     max_width = max_width.max(dx);
                 }
                 Fragment::CustomColour(field) => {
@@ -372,11 +430,20 @@ pub fn draw_block(
             }
         }
         if !skip_padding {
-            print_in_view(runtime, x + dx, y + dy, delimeters.1, block_colors, fake)?;
-            let d_count = delimeters.1.chars().count() as i32;
-            accumulators.add_row_to_cache(block_id, x + dx, y + dy, d_count);
-            dx += d_count;
-            max_width = max_width.max(dx);
+            match delimeters {
+                Ok((_, d)) => {
+                    print_in_view(runtime, x + dx, y + dy, d, block_colors, fake)?;
+                    let d_count = d.chars().count() as i32;
+                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, d_count);
+                    dx += d_count;
+                }
+                Err(_) => {
+                    print_in_view(runtime, x + dx, y + dy, " ", block_colors, fake)?;
+                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, 1);
+                    dx += 1;
+                }
+            }
+            max_width = max_width.max(dx)
         }
         skip_padding = false;
 
@@ -398,11 +465,11 @@ pub fn draw_block(
         accumulators.add_row_to_cache(block_id, x, y, max_width);
     }
 
+    accumulators.add_drop_point(x, y + dy, Shape::Stack, block_id, None);
     if let Some(next_id) = &block.next_id {
         dy += draw_block(runtime, next_id, x, y + dy, accumulators, fake)?;
         accumulators.mark_block_offset(next_id, 0, dy);
     }
-    accumulators.add_drop_point(x, y + dy, Shape::Stack, block_id, None);
     queue!(stdout(), ResetColor)?;
 
     if let Shape::Stack = spec.shape {
@@ -582,9 +649,9 @@ pub fn draw_toolbox(
             queue!(stdout(), ResetColor)?;
         }
         if let Shape::Stack = shape {
-            dy += delta;
+            dy += delta + 1;
         } else {
-            dy += 1;
+            dy += 2;
         }
         if dy >= runtime.viewport.height() {
             runtime.toolbox_visible_max = i;
