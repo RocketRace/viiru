@@ -62,6 +62,7 @@ pub struct Runtime<'js, 'a> {
     pub block_positions: HashMap<(i32, i32), Vec<String>>,
     pub cursor_block: Option<String>,
     pub drop_points: HashMap<(i32, i32), DropPoint>,
+    pub writable_points: HashMap<(i32, i32), String>,
     // synchronized data
     pub blocks: HashMap<String, Block>,
     pub top_level: Vec<String>,
@@ -118,6 +119,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             block_positions: HashMap::new(),
             cursor_block: None,
             drop_points: HashMap::new(),
+            writable_points: HashMap::new(),
             // synchronized data
             blocks: HashMap::new(),
             top_level: vec![],
@@ -183,6 +185,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     pub fn process_accumulators(&mut self, accumulators: Accumulators) {
         self.block_positions = accumulators.block_positions;
         self.drop_points = accumulators.drop_points;
+        self.writable_points = accumulators.writable_points;
         for (id, (dx, dy)) in accumulators.block_offsets {
             self.blocks.get_mut(&id).unwrap().offset_x = dx;
             self.blocks.get_mut(&id).unwrap().offset_y = dy;

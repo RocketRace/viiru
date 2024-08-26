@@ -126,10 +126,11 @@ pub struct Accumulators {
     pub block_positions: HashMap<(i32, i32), Vec<String>>,
     pub block_offsets: HashMap<String, (i32, i32)>,
     pub drop_points: HashMap<(i32, i32), DropPoint>,
+    pub writable_points: HashMap<(i32, i32), String>,
 }
 
 impl Accumulators {
-    pub fn add_row_to_cache(&mut self, block_id: &str, x: i32, y: i32, width: i32) {
+    pub fn add_grab_row(&mut self, block_id: &str, x: i32, y: i32, width: i32) {
         for i in 0..width {
             self.block_positions
                 .entry((x + i, y))
@@ -151,6 +152,13 @@ impl Accumulators {
                 input: input.map(|s| s.to_string()),
             },
         );
+    }
+
+    pub fn add_writable_row(&mut self, block_id: &str, x: i32, y: i32, width: i32) {
+        for i in 0..width {
+            self.writable_points
+                .insert((x + i, y), block_id.to_string());
+        }
     }
 }
 
@@ -256,7 +264,11 @@ pub fn draw_block(
             Ok((d, _)) => {
                 print_in_view(runtime, x, y + dy, d, block_colors, true, fake)?;
                 let d_count = d.chars().count();
-                accumulators.add_row_to_cache(block_id, x, y + dy, d_count as i32);
+                if BLOCKS[&block.opcode].is_shadow {
+                    accumulators.add_writable_row(block_id, x, y + dy, d_count as i32);
+                } else {
+                    accumulators.add_grab_row(block_id, x, y + dy, d_count as i32);
+                }
                 dx += d_count as i32;
             }
             Err((top, bottom)) => {
@@ -269,7 +281,7 @@ pub fn draw_block(
                     is_end,
                     fake,
                 )?;
-                accumulators.add_row_to_cache(block_id, x, y + dy, 2);
+                accumulators.add_grab_row(block_id, x, y + dy, 2);
                 dx += 2;
             }
         }
@@ -279,7 +291,7 @@ pub fn draw_block(
                 Fragment::Text(text) => {
                     print_in_view(runtime, x + dx, y + dy, text, block_colors, true, fake)?;
                     let count = text.chars().count() as i32;
-                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, count);
+                    accumulators.add_grab_row(block_id, x + dx, y + dy, count);
                     dx += count;
                     max_width = max_width.max(dx);
                 }
@@ -288,7 +300,6 @@ pub fn draw_block(
                         shadow_id,
                         block_id: child_id,
                     } = &block.inputs[input_name];
-                    let is_not_covered = child_id.is_none();
                     let topmost = child_id.clone().or(shadow_id.clone());
                     accumulators.add_drop_point(
                         x + dx,
@@ -301,14 +312,11 @@ pub fn draw_block(
                         let delta =
                             draw_block(runtime, &input_id, x + dx, y + dy, accumulators, fake)?;
                         accumulators.mark_block_offset(&input_id, dx, dy);
-                        if is_not_covered {
-                            accumulators.add_row_to_cache(block_id, x + dx, y + dy, delta);
-                        }
                         dx += delta;
                         max_width = max_width.max(dx);
                     } else {
                         print_in_view(runtime, x + dx, y + dy, "()", alt_colors, true, fake)?;
-                        accumulators.add_row_to_cache(block_id, x + dx, y + dy, 2);
+                        accumulators.add_grab_row(block_id, x + dx, y + dy, 2);
                         dx += 2;
                         max_width = max_width.max(dx);
                     }
@@ -317,7 +325,7 @@ pub fn draw_block(
                     let connected = block.inputs[substack_name].block_id.is_some();
                     let s = alignment_point(false, connected, true, true);
                     print_in_view(runtime, x + dx, y + dy, s, block_colors, true, fake)?;
-                    accumulators.add_row_to_cache(block_id, x, y + dy, 2);
+                    accumulators.add_grab_row(block_id, x, y + dy, 2);
                     dx += 2;
                     max_width = max_width.max(dx);
                 }
@@ -337,7 +345,7 @@ pub fn draw_block(
                         max_width = max_width.max(dx);
                     } else {
                         print_in_view(runtime, x + dx, y + dy, "<>", alt_colors, true, fake)?;
-                        accumulators.add_row_to_cache(block_id, x + dx, y + dy, 2);
+                        accumulators.add_grab_row(block_id, x + dx, y + dy, 2);
                         dx += 2;
                         max_width = max_width.max(dx);
                     }
@@ -365,7 +373,7 @@ pub fn draw_block(
                                 false,
                                 fake,
                             )?;
-                            accumulators.add_row_to_cache(block_id, x, y + dy + y_range, 2);
+                            accumulators.add_grab_row(block_id, x, y + dy + y_range, 2);
                         }
                         dy += stack_height;
                     }
@@ -383,7 +391,7 @@ pub fn draw_block(
                         fake,
                     )?;
                     let count = 2 + field.chars().count() as i32;
-                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, count);
+                    accumulators.add_grab_row(block_id, x + dx, y + dy, count);
                     // TODO: add interactors
                     dx += count;
                 }
@@ -398,7 +406,7 @@ pub fn draw_block(
                         true,
                         fake,
                     )?;
-                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, max_width - 1);
+                    accumulators.add_grab_row(block_id, x + dx, y + dy, max_width - 1);
                     skip_padding = true;
                     dx = max_width;
                 }
@@ -417,19 +425,19 @@ pub fn draw_block(
                     );
                     // todo: ascii equivalent?
                     print_in_view(runtime, x + dx, y + dy, "▸", flag_color, true, fake)?;
-                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, 1);
+                    accumulators.add_grab_row(block_id, x + dx, y + dy, 1);
                     dx += 1;
                     max_width = max_width.max(dx);
                 }
                 Fragment::Clockwise => {
                     print_in_view(runtime, x + dx, y + dy, "↻", block_colors, true, fake)?;
-                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, 1);
+                    accumulators.add_grab_row(block_id, x + dx, y + dy, 1);
                     dx += 1;
                     max_width = max_width.max(dx);
                 }
                 Fragment::Anticlockwise => {
                     print_in_view(runtime, x + dx, y + dy, "↺", block_colors, true, fake)?;
-                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, 1);
+                    accumulators.add_grab_row(block_id, x + dx, y + dy, 1);
                     dx += 1;
                     max_width = max_width.max(dx);
                 }
@@ -437,7 +445,7 @@ pub fn draw_block(
                     let Field { text, .. } = block.fields.get(field).unwrap();
                     print_in_view(runtime, x + dx, y + dy, text, block_colors, true, fake)?;
                     let count = text.chars().count() as i32;
-                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, count);
+                    accumulators.add_grab_row(block_id, x + dx, y + dy, count);
                     dx += count;
                     max_width = max_width.max(dx);
                 }
@@ -445,7 +453,7 @@ pub fn draw_block(
                     let Field { text, .. } = block.fields.get(field).unwrap();
                     print_in_view(runtime, x + dx, y + dy, text, block_colors, true, fake)?;
                     let count = text.chars().count() as i32;
-                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, count);
+                    accumulators.add_writable_row(block_id, x + dx, y + dy, count);
                     // TODO: add interactors
                     dx += count;
                     max_width = max_width.max(dx);
@@ -458,7 +466,7 @@ pub fn draw_block(
                     let (r, g, b) = parse_rgb(&rgb_string[1..]);
                     let custom_colours = Colors::new(Color::Reset, Color::Rgb { r, g, b });
                     print_in_view(runtime, x + dx, y + dy, "  ", custom_colours, true, fake)?;
-                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, 2);
+                    accumulators.add_grab_row(block_id, x + dx, y + dy, 2);
                     // TODO: add interactors
                     dx += 2;
                     max_width = max_width.max(dx);
@@ -471,12 +479,16 @@ pub fn draw_block(
                 Ok((_, d)) => {
                     print_in_view(runtime, x + dx, y + dy, d, block_colors, true, fake)?;
                     let d_count = d.chars().count() as i32;
-                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, d_count);
+                    if BLOCKS[&block.opcode].is_shadow {
+                        accumulators.add_writable_row(block_id, x + dx, y + dy, d_count);
+                    } else {
+                        accumulators.add_grab_row(block_id, x + dx, y + dy, d_count);
+                    }
                     dx += d_count;
                 }
                 Err(_) => {
                     print_in_view(runtime, x + dx, y + dy, " ", block_colors, true, fake)?;
-                    accumulators.add_row_to_cache(block_id, x + dx, y + dy, 1);
+                    accumulators.add_grab_row(block_id, x + dx, y + dy, 1);
                     dx += 1;
                 }
             }
@@ -500,7 +512,7 @@ pub fn draw_block(
             false,
             fake,
         )?;
-        accumulators.add_row_to_cache(block_id, x, y, max_width);
+        accumulators.add_grab_row(block_id, x, y, max_width);
     }
 
     accumulators.add_drop_point(x, y + dy, Shape::Stack, block_id, None);
