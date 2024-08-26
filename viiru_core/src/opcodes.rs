@@ -81,7 +81,7 @@ pub static BLOCKS: LazyLock<HashMap<String, Spec>> = LazyLock::new(|| {
         ("sensing_touchingcolor".into(),         spec("<71AFD2/FFFFFF/4B8CB4>touching color (COLOR=#3D7088)?")),
         ("sensing_coloristouchingcolor".into(),  spec("<71AFD2/FFFFFF/4B8CB4>color (COLOR=#461C5B) is touching (COLOR2=#5BB033)?")),
         ("sensing_distanceto".into(),            spec("(71AFD2/FFFFFF/4B8CB4)distance to(DISTANCETOMENU=sensing_distancetomenu)")),
-        ("sensing_askandwait".into(),            spec("{71AFD2/FFFFFF/4B8CB4}ask (QUESTION=`What's your name?`) and want")),
+        ("sensing_askandwait".into(),            spec("{71AFD2/FFFFFF/4B8CB4}ask (QUESTION=`What's your name?`) and wait")),
         ("sensing_answer".into(),                spec("(71AFD2/FFFFFF/4B8CB4)answer")),
         ("sensing_keypressed".into(),            spec("<71AFD2/FFFFFF/4B8CB4>key (KEY_OPTION=sensing_keyoptions) pressed?")),
         ("sensing_mousedown".into(),             spec("<71AFD2/FFFFFF/4B8CB4>mouse down?")),
