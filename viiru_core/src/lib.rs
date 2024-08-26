@@ -85,16 +85,32 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                 // TODO: implement some form of culling
                 let mut placement_grid = HashMap::new();
                 for top_id in &runtime.top_level {
-                    // if top_id != &start {
+                    // draw the cursor block last so it's always on top
+                    let is_cursor = if let Some(cursor_id) = &runtime.cursor_block {
+                        cursor_id == top_id
+                    } else {
+                        false
+                    };
+                    if !is_cursor {
+                        draw_block(
+                            &runtime,
+                            top_id,
+                            runtime.blocks[top_id].x,
+                            runtime.blocks[top_id].y,
+                            &mut placement_grid,
+                            false,
+                        )?;
+                    }
+                }
+                if let Some(cursor_id) = &runtime.cursor_block {
                     draw_block(
                         &runtime,
-                        top_id,
-                        runtime.blocks[top_id].x,
-                        runtime.blocks[top_id].y,
+                        cursor_id,
+                        runtime.blocks[cursor_id].x,
+                        runtime.blocks[cursor_id].y,
                         &mut placement_grid,
                         false,
                     )?;
-                    // }
                 }
                 runtime.placement_grid = placement_grid;
                 draw_cursor(&runtime)?;
