@@ -429,17 +429,17 @@ pub fn draw_block(
                     max_width = max_width.max(dx);
                 }
                 Fragment::FieldText(field) => {
-                    let Field { text, .. } = block.fields.get(field).unwrap();
-                    print_in_view(runtime, x + dx, y + dy, text, block_colors, true, fake)?;
-                    let count = text.chars().count() as i32;
+                    let Field { value, .. } = block.fields.get(field).unwrap();
+                    print_in_view(runtime, x + dx, y + dy, value, block_colors, true, fake)?;
+                    let count = value.chars().count() as i32;
                     accumulators.add_grab_row(block_id, x + dx, y + dy, count);
                     dx += count;
                     max_width = max_width.max(dx);
                 }
                 Fragment::WritableFieldText(field) => {
-                    let Field { text, .. } = block.fields.get(field).unwrap();
-                    print_in_view(runtime, x + dx, y + dy, text, block_colors, true, fake)?;
-                    let count = text.chars().count() as i32;
+                    let Field { value, .. } = block.fields.get(field).unwrap();
+                    print_in_view(runtime, x + dx, y + dy, value, block_colors, true, fake)?;
+                    let count = value.chars().count() as i32;
                     accumulators.add_writable_row(block_id, x + dx, y + dy, count);
                     // TODO: add interactors
                     dx += count;
@@ -447,7 +447,7 @@ pub fn draw_block(
                 }
                 Fragment::CustomColour(field) => {
                     let Field {
-                        text: rgb_string, ..
+                        value: rgb_string, ..
                     } = block.fields.get(field).unwrap();
                     // #RRGGBB format
                     let (r, g, b) = parse_rgb(&rgb_string[1..]);

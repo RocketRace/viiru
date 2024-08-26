@@ -38,9 +38,6 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         runtime.toolbox_width = 45;
         runtime.status_height = 5;
 
-        runtime.scroll_x = -runtime.viewport_offset_x;
-        runtime.scroll_y = -runtime.viewport_offset_y;
-
         let WindowSize { columns, rows, .. } = window_size()?;
 
         runtime.window_cols = columns;
@@ -51,6 +48,8 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         runtime.viewport.y_max = rows as i32 - runtime.status_height;
 
         // center the view on 0, 0
+        runtime.scroll_x = -runtime.viewport_offset_x;
+        runtime.scroll_y = -runtime.viewport_offset_y;
         runtime.scroll_x -= (runtime.viewport.x_max - runtime.viewport.x_min) / 2;
         runtime.scroll_y -= (runtime.viewport.y_max - runtime.viewport.y_min) / 2;
 
@@ -374,6 +373,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                                 } else {
                                                     // todo: support sandwiching
                                                     if runtime.blocks[&parent_id].next_id.is_none()
+                                                        && !runtime.blocks[&parent_id].is_boot()
                                                     {
                                                         runtime
                                                             .attach_next(&cursor_id, &parent_id)?;

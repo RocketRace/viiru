@@ -39,11 +39,18 @@ impl Block {
         }
     }
 
+    /// this needs to be a function, since control_stop's bootness is dynamic
+    pub fn is_boot(&self) -> bool {
+        self.opcode == "control_delete_this_clone"
+            || (self.opcode == "control_stop"
+                && self.fields["STOP_OPTION"].value != "other scripts in sprite")
+    }
+
     /// returns the old value, or None on failure
     pub fn set_field_text(&mut self, field_name: &str, text: &str) -> Option<String> {
         let field = self.fields.get_mut(field_name)?;
         let mut text = text.to_string();
-        std::mem::swap(&mut field.text, &mut text);
+        std::mem::swap(&mut field.value, &mut text);
         Some(text)
     }
 
@@ -70,6 +77,6 @@ pub struct Input {
 
 #[derive(Clone)]
 pub struct Field {
-    pub text: String,
+    pub value: String,
     pub id: Option<String>,
 }

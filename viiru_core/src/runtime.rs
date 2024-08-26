@@ -295,7 +295,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
                     Some((
                         field.clone(),
                         Field {
-                            text: "".into(),
+                            value: "".into(),
                             id: None,
                         },
                     ))
@@ -375,7 +375,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             self.slide_block_to(&stamp_id, new_x, new_y)?;
         }
         for (field_name, field) in original.fields {
-            self.set_field(&stamp_id, &field_name, &field.text, field.id.as_deref())?;
+            self.set_field(&stamp_id, &field_name, &field.value, field.id.as_deref())?;
         }
         if let Some(next_id) = original.next_id {
             let stamp_next_id = self.stamp_block(&next_id, false)?;
@@ -564,9 +564,9 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     pub fn get_strumber_field(&self, id: &str) -> String {
         let block = &self.blocks[id];
         if block.opcode == "text" {
-            block.fields["TEXT"].text.clone()
+            block.fields["TEXT"].value.clone()
         } else if NUMBERS_ISH.contains(&block.opcode.as_str()) {
-            block.fields["NUM"].text.clone()
+            block.fields["NUM"].value.clone()
         } else {
             // once again, use the type system please
             "".into()

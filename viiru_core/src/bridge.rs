@@ -97,8 +97,8 @@ pub fn to_block<'js>(
     let fields = map_each_value(cx, fields_obj, |cx, field| {
         // used for vars / lists / bcs
         let id = optional_str_value(cx, field, "id")?;
-        let text = str_value(cx, field, "value")?;
-        Ok(Field { text, id })
+        let value = str_value(cx, field, "value")?;
+        Ok(Field { value, id })
     })?;
 
     // 50px per cell
