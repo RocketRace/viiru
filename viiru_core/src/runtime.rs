@@ -53,6 +53,10 @@ pub struct Runtime<'js, 'a> {
     pub command_buffer: String,
     pub status_message: String,
     // constant data
+    pub viewport_offset_x: i32,
+    pub viewport_offset_y: i32,
+    pub toolbox_width: i32,
+    pub status_height: i32,
     pub toolbox: Vec<String>,
     // ephemeral data
     pub block_positions: HashMap<(i32, i32), Vec<String>>,
@@ -105,6 +109,10 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             command_buffer: String::new(),
             status_message: String::new(),
             // constant data
+            viewport_offset_x: 0,
+            viewport_offset_y: 0,
+            toolbox_width: 0,
+            status_height: 0,
             toolbox: vec![],
             // ephemeral data
             block_positions: HashMap::new(),
@@ -473,21 +481,25 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         let parent_id = self.blocks[id].parent_id.clone();
         if let Some(parent_id) = parent_id {
             let parent = self.blocks.get_mut(&parent_id).unwrap();
-            let (input_name, is_shadow) = parent
-                .inputs
-                .iter()
-                .filter_map(|(input_name, input)| {
-                    if let Some(bid) = &input.block_id {
-                        (bid == id).then(|| (input_name.clone(), false))
-                    } else if let Some(bid) = &input.shadow_id {
-                        (bid == id).then(|| (input_name.clone(), true))
-                    } else {
-                        None
-                    }
-                })
-                .next()
-                .unwrap();
-            parent.remove_input(&input_name, is_shadow);
+            if parent.next_id.is_some() {
+                parent.next_id = None;
+            } else {
+                let (input_name, is_shadow) = parent
+                    .inputs
+                    .iter()
+                    .filter_map(|(input_name, input)| {
+                        if let Some(bid) = &input.block_id {
+                            (bid == id).then(|| (input_name.clone(), false))
+                        } else if let Some(bid) = &input.shadow_id {
+                            (bid == id).then(|| (input_name.clone(), true))
+                        } else {
+                            None
+                        }
+                    })
+                    .next()
+                    .unwrap();
+                parent.remove_input(&input_name, is_shadow);
+            }
             self.top_level.push(id.to_string());
         }
         self.blocks.get_mut(id).unwrap().parent_id = None;

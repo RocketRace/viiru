@@ -7,22 +7,17 @@ mod spec;
 mod ui;
 mod util;
 
-use std::io::{stdout, Write};
+use std::io::stdout;
 
 use crossterm::{
-    cursor::{Hide, MoveRight, MoveTo, MoveToColumn},
     event::{read, KeyCode, KeyEventKind},
-    execute, queue,
-    style::Print,
+    execute,
     terminal::{window_size, Clear, ClearType, WindowSize},
 };
 use neon::prelude::*;
 use opcodes::TOOLBOX;
 use runtime::{Runtime, State};
-use ui::{
-    draw_block, draw_cursor, draw_cursor_lines, draw_marker_dots, draw_toolbox,
-    draw_viewport_border, in_terminal_scope, Accumulators,
-};
+use ui::{draw_toolbox, in_terminal_scope, refresh_screen};
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
@@ -48,106 +43,30 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         }
         runtime.do_sync = true;
 
-        let viewport_offset_x = 3;
-        let viewport_offset_y = 1;
-        let toolbox_width = 45;
-        let status_height = 5;
+        runtime.viewport_offset_x = 3;
+        runtime.viewport_offset_y = 1;
+        runtime.toolbox_width = 45;
+        runtime.status_height = 5;
 
-        runtime.scroll_x = -viewport_offset_x;
-        runtime.scroll_y = -viewport_offset_y;
+        runtime.scroll_x = -runtime.viewport_offset_x;
+        runtime.scroll_y = -runtime.viewport_offset_y;
 
         let WindowSize { columns, rows, .. } = window_size()?;
 
         runtime.window_cols = columns;
         runtime.window_rows = columns;
-        runtime.viewport.x_min = viewport_offset_x;
-        runtime.viewport.x_max = columns as i32 - toolbox_width;
-        runtime.viewport.y_min = viewport_offset_y;
-        runtime.viewport.y_max = rows as i32 - status_height;
+        runtime.viewport.x_min = runtime.viewport_offset_x;
+        runtime.viewport.x_max = columns as i32 - runtime.toolbox_width;
+        runtime.viewport.y_min = runtime.viewport_offset_y;
+        runtime.viewport.y_max = rows as i32 - runtime.status_height;
 
         // center the view on 0, 0
         runtime.scroll_x -= (runtime.viewport.x_max - runtime.viewport.x_min) / 2;
         runtime.scroll_y -= (runtime.viewport.y_max - runtime.viewport.y_min) / 2;
 
-        let mut needs_refresh = true;
+        refresh_screen(&mut runtime)?;
+        let mut needs_refresh = false;
         loop {
-            // TODO: implement some form of culling & per-component refresh
-            if needs_refresh {
-                queue!(stdout(), Clear(ClearType::All), Hide)?;
-                draw_viewport_border(&runtime)?;
-                draw_marker_dots(&runtime)?;
-                draw_cursor_lines(&runtime)?;
-                let mut accumulators = Accumulators::default();
-                for top_id in &runtime.top_level {
-                    // draw the cursor block last so it's always on top
-                    let is_cursor = if let Some(cursor_id) = &runtime.cursor_block {
-                        cursor_id == top_id
-                    } else {
-                        false
-                    };
-                    if !is_cursor {
-                        draw_block(
-                            &runtime,
-                            top_id,
-                            runtime.blocks[top_id].x,
-                            runtime.blocks[top_id].y,
-                            &mut accumulators,
-                            false,
-                        )?;
-                    }
-                }
-                if let Some(cursor_id) = &runtime.cursor_block {
-                    draw_block(
-                        &runtime,
-                        cursor_id,
-                        runtime.blocks[cursor_id].x,
-                        runtime.blocks[cursor_id].y,
-                        &mut accumulators,
-                        false,
-                    )?;
-                }
-                runtime.process_accumulators(accumulators);
-                // this must occur after accumulators are processed, i.e. drop points are registered
-                if let Some((parent_id, input_name)) = runtime.current_drop_point() {
-                    // todo
-                }
-                let position = format!("{},{}", runtime.cursor_x, runtime.cursor_y);
-                queue!(
-                    stdout(),
-                    MoveTo(
-                        runtime.viewport.x_max as u16 - position.len() as u16,
-                        runtime.viewport.y_max as u16 + 1,
-                    ),
-                    Print(position),
-                    MoveRight(1),
-                    Print(runtime.last_command),
-                )?;
-                if let State::Command = runtime.state {
-                    let command_prefix = match runtime.last_command {
-                        'o' => "file path: ",
-                        'w' => "output path: ",
-                        _ => "",
-                    };
-                    queue!(
-                        stdout(),
-                        MoveToColumn(runtime.viewport.x_min as u16),
-                        Print(command_prefix),
-                        Print(&runtime.command_buffer)
-                    )?;
-                } else {
-                    queue!(
-                        stdout(),
-                        MoveToColumn(runtime.viewport.x_min as u16),
-                        Print(&runtime.status_message)
-                    )?;
-                }
-                draw_toolbox(&mut runtime, viewport_offset_x, viewport_offset_y, false)?;
-                needs_refresh = false;
-                // cursor is always drawn last
-                draw_cursor(&runtime)?;
-                stdout().flush()?;
-            }
-
             match read()? {
                 crossterm::event::Event::Key(event) => {
                     if event.kind == KeyEventKind::Press {
@@ -244,12 +163,9 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                         while runtime.toolbox_cursor > runtime.toolbox_visible_max {
                                             runtime.toolbox_scroll = (runtime.toolbox_scroll + 1)
                                                 .min(runtime.toolbox.len() - 1);
-                                            draw_toolbox(
-                                                &mut runtime,
-                                                viewport_offset_x,
-                                                viewport_offset_y,
-                                                true,
-                                            )?;
+                                            let vox = runtime.viewport_offset_x;
+                                            let voy = runtime.viewport_offset_y;
+                                            draw_toolbox(&mut runtime, vox, voy, true)?;
                                         }
                                         needs_refresh = true;
                                     }
@@ -441,6 +357,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                             } else {
                                                 runtime.cursor_block.take().unwrap();
                                             }
+                                            needs_refresh = true;
                                             runtime.state = State::Move;
                                         }
                                         State::Toolbox => {
@@ -468,13 +385,18 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                 crossterm::event::Event::Resize(new_columns, new_rows) => {
                     runtime.window_cols = new_columns;
                     runtime.window_rows = new_rows;
-                    runtime.viewport.x_min = viewport_offset_x;
-                    runtime.viewport.x_max = new_columns as i32 - toolbox_width;
-                    runtime.viewport.y_min = viewport_offset_y;
-                    runtime.viewport.y_max = new_rows as i32 - status_height;
+                    runtime.viewport.x_min = runtime.viewport_offset_x;
+                    runtime.viewport.x_max = new_columns as i32 - runtime.toolbox_width;
+                    runtime.viewport.y_min = runtime.viewport_offset_y;
+                    runtime.viewport.y_max = new_rows as i32 - runtime.status_height;
                     needs_refresh = true;
                 }
                 _ => (),
+            }
+            // TODO: implement some form of culling & per-component refresh
+            if needs_refresh {
+                refresh_screen(&mut runtime)?;
+                needs_refresh = false;
             }
         }
 

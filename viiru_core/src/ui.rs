@@ -1,13 +1,19 @@
 use core::str;
-use std::{collections::HashMap, io::stdout};
+use std::{
+    collections::HashMap,
+    io::{stdout, Write},
+};
 
 use crossterm::{
-    cursor::{Hide, MoveDown, MoveLeft, MoveTo, SetCursorStyle, Show},
+    cursor::{Hide, MoveDown, MoveLeft, MoveRight, MoveTo, MoveToColumn, SetCursorStyle, Show},
     execute, queue,
     style::{
         Attribute, Color, Colors, Print, ResetColor, SetAttribute, SetColors, SetForegroundColor,
     },
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{
+        disable_raw_mode, enable_raw_mode, Clear, ClearType, EnterAlternateScreen,
+        LeaveAlternateScreen,
+    },
 };
 
 use crate::{
@@ -499,8 +505,8 @@ pub fn draw_block(
 
     accumulators.add_drop_point(x, y + dy, Shape::Stack, block_id, None);
     if let Some(next_id) = &block.next_id {
-        dy += draw_block(runtime, next_id, x, y + dy, accumulators, fake)?;
         accumulators.mark_block_offset(next_id, 0, dy);
+        dy += draw_block(runtime, next_id, x, y + dy, accumulators, fake)?;
     }
     queue!(stdout(), ResetColor)?;
 
@@ -696,12 +702,80 @@ pub fn draw_toolbox(
     Ok(())
 }
 
-pub fn highlight_cursor_block(runtime: &Runtime) -> ViiruResult<()> {
+pub fn refresh_screen(runtime: &mut Runtime) -> ViiruResult<()> {
+    queue!(stdout(), Clear(ClearType::All), Hide)?;
+    draw_viewport_border(runtime)?;
+    draw_marker_dots(runtime)?;
+    draw_cursor_lines(runtime)?;
+    let mut accumulators = Accumulators::default();
+    for top_id in &runtime.top_level {
+        // draw the cursor block last so it's always on top
+        let is_cursor = if let Some(cursor_id) = &runtime.cursor_block {
+            cursor_id == top_id
+        } else {
+            false
+        };
+        if !is_cursor {
+            draw_block(
+                runtime,
+                top_id,
+                runtime.blocks[top_id].x,
+                runtime.blocks[top_id].y,
+                &mut accumulators,
+                false,
+            )?;
+        }
+    }
     if let Some(cursor_id) = &runtime.cursor_block {
-        let x = runtime.blocks[cursor_id].x;
-        let y = runtime.blocks[cursor_id].y;
-        let highlight_colors = Colors::new(Color::Black, Color::White);
+        draw_block(
+            runtime,
+            cursor_id,
+            runtime.blocks[cursor_id].x,
+            runtime.blocks[cursor_id].y,
+            &mut accumulators,
+            false,
+        )?;
+    }
+    runtime.process_accumulators(accumulators);
+    // this must occur after accumulators are processed, i.e. drop points are registered
+    if let Some((parent_id, input_name)) = runtime.current_drop_point() {
         // todo
     }
+    let position = format!("{},{}", runtime.cursor_x, runtime.cursor_y);
+    queue!(
+        stdout(),
+        MoveTo(
+            runtime.viewport.x_max as u16 - position.len() as u16,
+            runtime.viewport.y_max as u16 + 1,
+        ),
+        Print(position),
+        MoveRight(1),
+        Print(runtime.last_command),
+    )?;
+    if let State::Command = runtime.state {
+        let command_prefix = match runtime.last_command {
+            'o' => "file path: ",
+            'w' => "output path: ",
+            _ => "",
+        };
+        queue!(
+            stdout(),
+            MoveToColumn(runtime.viewport.x_min as u16),
+            Print(command_prefix),
+            Print(&runtime.command_buffer)
+        )?;
+    } else {
+        queue!(
+            stdout(),
+            MoveToColumn(runtime.viewport.x_min as u16),
+            Print(&runtime.status_message)
+        )?;
+    }
+    let vox = runtime.viewport_offset_x;
+    let voy = runtime.viewport_offset_y;
+    draw_toolbox(runtime, vox, voy, false)?;
+    // cursor is always drawn last
+    draw_cursor(runtime)?;
+    stdout().flush()?;
     Ok(())
 }
