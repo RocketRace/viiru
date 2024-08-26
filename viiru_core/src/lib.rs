@@ -15,7 +15,6 @@ use crossterm::{
     terminal::{window_size, Clear, ClearType, WindowSize},
 };
 use neon::prelude::*;
-use opcodes::TOOLBOX;
 use runtime::{Runtime, State};
 use ui::{draw_toolbox, in_terminal_scope, refresh_screen};
 
@@ -33,15 +32,6 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         // todo: replace with a proper implementation of "new project"
         runtime.load_project("viiru_core/empty.sb3")?;
         execute!(stdout(), Clear(ClearType::All))?;
-
-        // initialize toolbox
-        runtime.do_sync = false;
-        for opcode in TOOLBOX.iter() {
-            let (id, _) = runtime.create_block_template(opcode)?;
-            runtime.remove_top_level(&id);
-            runtime.toolbox.push(id);
-        }
-        runtime.do_sync = true;
 
         runtime.viewport_offset_x = 3;
         runtime.viewport_offset_y = 1;

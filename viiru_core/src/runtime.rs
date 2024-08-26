@@ -5,7 +5,7 @@ use neon::prelude::*;
 use crate::{
     block::{Block, Field, Input},
     bridge::{self, map_each_value, string_of, to_block, VariableType},
-    opcodes::{BLOCKS, NUMBERS_ISH},
+    opcodes::{BLOCKS, NUMBERS_ISH, TOOLBOX},
     result::{undefined_or_throw, ViiruResult},
     spec::Fragment,
     ui::{Accumulators, DropPoint},
@@ -35,7 +35,7 @@ pub struct Runtime<'js, 'a> {
     next_usable_id: usize,
     cx: &'a mut FunctionContext<'js>,
     api: Handle<'js, JsObject>,
-    pub do_sync: bool,
+    do_sync: bool,
     pub state: State,
     is_dirty: bool,
     // ui
@@ -218,11 +218,23 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             .filter(|&(_, block)| block.parent_id.is_none())
             .map(|(id, _)| id.clone())
             .collect();
+        self.initialize_toolbox_blocks()?;
         self.cursor_block = None;
         self.variables = self.get_variables_of_type(VariableType::Scalar)?;
         self.lists = self.get_variables_of_type(VariableType::List)?;
         self.broadcasts = self.get_variables_of_type(VariableType::Broadcast)?;
         Ok(true)
+    }
+
+    fn initialize_toolbox_blocks(&mut self) -> NeonResult<()> {
+        self.do_sync = false;
+        for opcode in TOOLBOX.iter() {
+            let (id, _) = self.create_block_template(opcode)?;
+            self.remove_top_level(&id);
+            self.toolbox.push(id);
+        }
+        self.do_sync = true;
+        Ok(())
     }
 
     pub fn save_project(&mut self, path: &str) -> NeonResult<bool> {
