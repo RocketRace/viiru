@@ -61,17 +61,29 @@ const resolve = <T>(p: Promise<T>): T | undefined => {
 }
 
 // == editor functions ==
-const loadProject = (path: string) => {
-    const buffer = fs.readFileSync(path);
-    resolve(vm.loadProject(buffer));
+const loadProject = (path: string): boolean => {
+    try {
+        const buffer = fs.readFileSync(path);
+        resolve(vm.loadProject(buffer));
+        return true;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error: any) {
+        return false;
+    }
 }
 
-const saveProject = (path: string) => {
-    resolve(vm.saveProjectSb3().then(
-        blob => blob.arrayBuffer().then(
-            buffer => fs.writeFileSync(path, new Uint8Array(buffer))
-        )
-    ));
+const saveProject = (path: string): boolean => {
+    try {
+        resolve(vm.saveProjectSb3().then(
+            blob => blob.arrayBuffer().then(
+                buffer => fs.writeFileSync(path, new Uint8Array(buffer))
+            )
+        ));
+        return true;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error: any) {
+        return false;
+    }
 }
 
 // this one is a bit weird because the VM will only accept fully 

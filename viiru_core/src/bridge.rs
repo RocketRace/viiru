@@ -145,10 +145,9 @@ pub fn load_project<'js>(
     cx: &mut FunctionContext<'js>,
     api: Handle<JsObject>,
     path: &str,
-) -> JsResult<'js, JsUndefined> {
+) -> JsResult<'js, JsBoolean> {
     let args = args!(cx; cx.string(path));
     let result = api_call(cx, api, "loadProject", args)?;
-    // what's a race condition
     Ok(result)
 }
 
@@ -156,7 +155,7 @@ pub fn save_project<'js>(
     cx: &mut FunctionContext<'js>,
     api: Handle<JsObject>,
     path: &str,
-) -> JsResult<'js, JsUndefined> {
+) -> JsResult<'js, JsBoolean> {
     let args = args!(cx; cx.string(path));
     let result = api_call(cx, api, "saveProject", args)?;
     Ok(result)

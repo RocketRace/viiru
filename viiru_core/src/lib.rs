@@ -36,7 +36,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
     let result = in_terminal_scope(|| {
         // todo: replace with a proper implementation of "new project"
-        runtime.load_project("example/empty.sb3")?;
+        runtime.load_project("viiru_core/empty.sb3")?;
         execute!(stdout(), Clear(ClearType::All))?;
 
         // initialize toolbox
@@ -134,6 +134,12 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                         Print(command_prefix),
                         Print(&runtime.command_buffer)
                     )?;
+                } else {
+                    queue!(
+                        stdout(),
+                        MoveToColumn(runtime.viewport.x_min as u16),
+                        Print(&runtime.status_message)
+                    )?;
                 }
                 draw_toolbox(&mut runtime, viewport_offset_x, viewport_offset_y, false)?;
                 needs_refresh = false;
@@ -151,10 +157,31 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                 KeyCode::Enter => {
                                     let buf = std::mem::take(&mut runtime.command_buffer);
                                     match runtime.last_command {
-                                        'o' => runtime.load_project(&buf)?,
-                                        'w' => runtime.save_project(&buf)?,
+                                        'o' => {
+                                            if !runtime.load_project(&buf)? {
+                                                runtime.status_message =
+                                                    format!("Failed to open project file at {buf}");
+                                            } else {
+                                                runtime.status_message =
+                                                    format!("Opened project file {buf}");
+                                            }
+                                        }
+                                        'w' => {
+                                            if !runtime.save_project(&buf)? {
+                                                runtime.status_message = format!(
+                                                    "Failed to write project file to {buf}"
+                                                );
+                                            } else {
+                                                runtime.status_message =
+                                                    format!("Saved project into {buf}")
+                                            }
+                                        }
                                         _ => (),
                                     }
+                                    runtime.state = State::Move;
+                                }
+                                KeyCode::Esc => {
+                                    runtime.command_buffer.clear();
                                     runtime.state = State::Move;
                                 }
                                 KeyCode::Backspace => {
@@ -171,7 +198,8 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                             match event.code {
                                 KeyCode::Char('q') => {
                                     if runtime.is_dirty() {
-                                        // todo
+                                        runtime.status_message =
+                                            "Unsaved changes detected. (Q to force quit)".into()
                                     } else {
                                         break;
                                     }

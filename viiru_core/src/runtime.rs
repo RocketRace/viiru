@@ -51,6 +51,7 @@ pub struct Runtime<'js, 'a> {
     pub toolbox_visible_max: usize,
     pub last_command: char,
     pub command_buffer: String,
+    pub status_message: String,
     // constant data
     pub toolbox: Vec<String>,
     // ephemeral data
@@ -102,6 +103,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             toolbox_visible_max: 0,
             last_command: ' ',
             command_buffer: String::new(),
+            status_message: String::new(),
             // constant data
             toolbox: vec![],
             // ephemeral data
@@ -190,9 +192,12 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
     }
 
     /// be sure to clear the screen afterwards, as this creates some spam from the JS side
-    pub fn load_project(&mut self, path: &str) -> NeonResult<()> {
+    pub fn load_project(&mut self, path: &str) -> NeonResult<bool> {
         // todo: to ensure a proper reset, move self and return a new Runtime
-        bridge::load_project(self.cx, self.api, path)?;
+        let success = bridge::load_project(self.cx, self.api, path)?.value(self.cx);
+        if !success {
+            return Ok(false);
+        }
         self.blocks = self.get_all_blocks()?;
         self.top_level = self
             .blocks
@@ -204,13 +209,13 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         self.variables = self.get_variables_of_type(VariableType::Scalar)?;
         self.lists = self.get_variables_of_type(VariableType::List)?;
         self.broadcasts = self.get_variables_of_type(VariableType::Broadcast)?;
-        Ok(())
+        Ok(true)
     }
 
-    pub fn save_project(&mut self, path: &str) -> NeonResult<()> {
-        bridge::save_project(self.cx, self.api, path)?;
+    pub fn save_project(&mut self, path: &str) -> NeonResult<bool> {
+        let success = bridge::save_project(self.cx, self.api, path)?.value(self.cx);
         self.is_dirty = false;
-        Ok(())
+        Ok(success)
     }
 
     pub fn create_single_block(&mut self, opcode: &str) -> NeonResult<String> {
