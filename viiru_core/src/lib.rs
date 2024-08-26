@@ -21,7 +21,7 @@ use crossterm::{
 };
 use neon::prelude::*;
 use opcodes::OPCODES;
-use runtime::Runtime;
+use runtime::{Runtime, State};
 use ui::{
     draw_block, draw_cursor, draw_cursor_lines, draw_marker_dots, draw_viewport_border,
     in_terminal_scope,
@@ -65,11 +65,11 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
         let mut needs_refresh = true;
         loop {
-            queue!(stdout(), Clear(ClearType::All))?;
-            draw_viewport_border(&runtime)?;
-            draw_marker_dots(&runtime)?;
-            draw_cursor_lines(&runtime)?;
             if needs_refresh {
+                queue!(stdout(), Clear(ClearType::All))?;
+                draw_viewport_border(&runtime)?;
+                draw_marker_dots(&runtime)?;
+                draw_cursor_lines(&runtime)?;
                 // TODO: implement some form of culling
                 let mut placement_grid = HashMap::new();
                 for top_id in &runtime.top_level {
@@ -84,22 +84,21 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                     // }
                 }
                 runtime.placement_grid = placement_grid;
+                draw_cursor(&runtime)?;
+                let position = format!("{},{}", runtime.cursor_x, runtime.cursor_y);
+                queue!(
+                    stdout(),
+                    MoveTo(
+                        runtime.viewport.x_max as u16 - position.len() as u16 + 1,
+                        runtime.viewport.y_max as u16 + 1,
+                    ),
+                    Print(position)
+                )?;
 
+                stdout().flush()?;
                 needs_refresh = false;
             }
-            draw_cursor(&runtime)?;
-            let position = format!("{},{}", runtime.cursor_x, runtime.cursor_y);
 
-            queue!(
-                stdout(),
-                MoveTo(
-                    runtime.viewport.x_max as u16 - position.len() as u16 + 1,
-                    runtime.viewport.y_max as u16 + 1,
-                ),
-                Print(position)
-            )?;
-
-            stdout().flush()?;
             match read()? {
                 crossterm::event::Event::Key(event) => {
                     if event.kind == KeyEventKind::Press {
@@ -108,66 +107,105 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                 runtime.save_project("example/output.sb3")?;
                                 break;
                             }
-                            KeyCode::Char('h') => {
-                                runtime.move_x(-1)?;
-                                if runtime.cursor_x - runtime.scroll_x == runtime.viewport.y_min - 1
-                                {
+                            KeyCode::Char('h') => match runtime.state {
+                                State::Move | State::Hold => {
+                                    runtime.move_x(-1)?;
+                                    if runtime.cursor_x - runtime.scroll_x
+                                        == runtime.viewport.y_min - 1
+                                    {
+                                        runtime.scroll_x -= 1;
+                                    }
+                                    needs_refresh = true;
+                                }
+                                _ => (),
+                            },
+                            KeyCode::Char('j') => match runtime.state {
+                                State::Move | State::Hold => {
+                                    runtime.move_y(1)?;
+                                    if runtime.cursor_y - runtime.scroll_y == runtime.viewport.y_max
+                                    {
+                                        runtime.scroll_y += 1;
+                                    }
+                                    needs_refresh = true;
+                                }
+                                _ => (),
+                            },
+                            KeyCode::Char('k') => match runtime.state {
+                                State::Move | State::Hold => {
+                                    runtime.move_y(-1)?;
+                                    if runtime.cursor_y - runtime.scroll_y
+                                        == runtime.viewport.y_min - 1
+                                    {
+                                        runtime.scroll_y -= 1;
+                                    }
+                                    needs_refresh = true;
+                                }
+                                _ => (),
+                            },
+                            KeyCode::Char('l') => match runtime.state {
+                                State::Move | State::Hold => {
+                                    runtime.move_x(1)?;
+                                    if runtime.cursor_x - runtime.scroll_x == runtime.viewport.x_max
+                                    {
+                                        runtime.scroll_x += 1;
+                                    }
+                                    needs_refresh = true;
+                                }
+                                _ => (),
+                            },
+                            KeyCode::Char('H') => match runtime.state {
+                                State::Move | State::Hold => {
                                     runtime.scroll_x -= 1;
+                                    runtime.move_x(-1)?;
+                                    needs_refresh = true;
                                 }
-                                needs_refresh = true;
-                            }
-                            KeyCode::Char('j') => {
-                                runtime.move_y(1)?;
-                                if runtime.cursor_y - runtime.scroll_y == runtime.viewport.y_max {
+                                _ => (),
+                            },
+                            KeyCode::Char('J') => match runtime.state {
+                                State::Move | State::Hold => {
                                     runtime.scroll_y += 1;
+                                    runtime.move_y(1)?;
+                                    needs_refresh = true;
                                 }
-                                needs_refresh = true;
-                            }
-                            KeyCode::Char('k') => {
-                                runtime.move_y(-1)?;
-                                if runtime.cursor_y - runtime.scroll_y == runtime.viewport.y_min - 1
-                                {
+                                _ => (),
+                            },
+                            KeyCode::Char('K') => match runtime.state {
+                                State::Move | State::Hold => {
                                     runtime.scroll_y -= 1;
+                                    runtime.move_y(-1)?;
+                                    needs_refresh = true;
                                 }
-                                needs_refresh = true;
-                            }
-                            KeyCode::Char('l') => {
-                                runtime.move_x(1)?;
-                                if runtime.cursor_x - runtime.scroll_x == runtime.viewport.x_max {
+                                _ => (),
+                            },
+                            KeyCode::Char('L') => match runtime.state {
+                                State::Move | State::Hold => {
                                     runtime.scroll_x += 1;
+                                    runtime.move_x(1)?;
+                                    needs_refresh = true;
                                 }
-                                needs_refresh = true;
-                            }
-                            KeyCode::Char('H') => {
-                                runtime.scroll_x -= 1;
-                                runtime.move_x(-1)?;
-                                needs_refresh = true;
-                            }
-                            KeyCode::Char('J') => {
-                                runtime.scroll_y += 1;
-                                runtime.move_y(1)?;
-                                needs_refresh = true;
-                            }
-                            KeyCode::Char('K') => {
-                                runtime.scroll_y -= 1;
-                                runtime.move_y(-1)?;
-                                needs_refresh = true;
-                            }
-                            KeyCode::Char('L') => {
-                                runtime.scroll_x += 1;
-                                runtime.move_x(1)?;
-                                needs_refresh = true;
-                            }
+                                _ => (),
+                            },
                             KeyCode::Char(' ') => {
                                 // interaction!
-                                if let Some(a) = runtime
-                                    .placement_grid
-                                    .get(&(runtime.cursor_x, runtime.cursor_y))
-                                {
-                                    let selected = a.last().unwrap().clone();
-                                    runtime.detach_block(&selected)?;
-                                    runtime.cursor_block = Some(selected.clone());
-                                    needs_refresh = true;
+                                match runtime.state {
+                                    State::Move => {
+                                        if let Some(a) = runtime
+                                            .placement_grid
+                                            .get(&(runtime.cursor_x, runtime.cursor_y))
+                                        {
+                                            let selected = a.last().unwrap().clone();
+                                            runtime.detach_block(&selected)?;
+                                            runtime.cursor_block = Some(selected.clone());
+                                            needs_refresh = true;
+                                            runtime.state = State::Hold;
+                                        }
+                                    }
+                                    State::Hold => {
+                                        // TODO: attach to drop-off points
+                                        runtime.cursor_block.take().unwrap();
+                                        runtime.state = State::Move;
+                                    }
+                                    _ => (),
                                 }
                             }
                             _ => (),

@@ -33,12 +33,22 @@ pub struct Runtime<'js, 'a> {
     pub cursor_y: i32,
     pub placement_grid: HashMap<(i32, i32), Vec<String>>,
     pub cursor_block: Option<String>,
+    pub state: State,
     // data
     pub blocks: HashMap<String, Block>,
     pub top_level: HashSet<String>,
     pub variables: HashMap<String, String>,
     pub lists: HashMap<String, String>,
     pub broadcasts: HashMap<String, String>,
+}
+
+#[derive(Clone, Copy)]
+pub enum State {
+    Move,
+    Hold,
+    Toolbox,
+    Command,
+    Inline,
 }
 
 impl<'js, 'rt> Runtime<'js, 'rt> {
@@ -59,6 +69,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             cursor_y: 0,
             placement_grid: HashMap::new(),
             cursor_block: None,
+            state: State::Move,
             top_level: HashSet::new(),
             blocks: HashMap::new(),
             variables: HashMap::new(),
