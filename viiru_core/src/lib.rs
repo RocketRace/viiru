@@ -7,7 +7,10 @@ mod spec;
 mod ui;
 mod util;
 
-use std::io::{stdout, Write};
+use std::{
+    collections::HashMap,
+    io::{stdout, Write},
+};
 
 use crossterm::{
     cursor::MoveTo,
@@ -88,6 +91,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             draw_viewport_border(&runtime)?;
             draw_marker_dots(&runtime)?;
             draw_cursor_lines(&runtime)?;
+            let mut placement_cache = HashMap::new();
             for top_id in &runtime.top_level {
                 // if top_id != &start {
                 draw_block(
@@ -95,9 +99,11 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                     top_id,
                     runtime.blocks[top_id].x / 50,
                     runtime.blocks[top_id].y / 50,
+                    &mut placement_cache,
                 )?;
                 // }
             }
+            runtime.placement_grid = placement_cache;
             draw_cursor(&runtime)?;
             let position = format!("{},{}", runtime.cursor_x, runtime.cursor_y);
 
@@ -163,6 +169,12 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                             }
                             KeyCode::Char(' ') => {
                                 // interaction!
+                                if runtime
+                                    .placement_grid
+                                    .contains_key(&(runtime.cursor_x, runtime.cursor_y))
+                                {
+                                    runtime.cursor_x += 1;
+                                }
                             }
                             _ => (),
                         }

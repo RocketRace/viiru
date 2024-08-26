@@ -29,7 +29,7 @@ pub struct Runtime<'js, 'a> {
     pub scroll_y: i32,
     pub cursor_x: i32,
     pub cursor_y: i32,
-    pub placement_grid: HashMap<(i32, i32), String>,
+    pub placement_grid: HashMap<(i32, i32), Vec<String>>,
     pub blocks: HashMap<String, Block>,
     pub top_level: HashSet<String>,
     pub variables: HashMap<String, String>,
@@ -59,16 +59,6 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             variables: HashMap::new(),
             lists: HashMap::new(),
             broadcasts: HashMap::new(),
-        }
-    }
-
-    pub fn mark_in_grid(&mut self, x: i32, y: i32, id: &str) {
-        self.placement_grid.insert((x, y), id.to_string());
-    }
-
-    pub fn mark_row_in_grid(&mut self, x: i32, y: i32, width: usize, id: &str) {
-        for i in 0..width {
-            self.mark_in_grid(x + i as i32, y, id);
         }
     }
 

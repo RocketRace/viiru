@@ -1,4 +1,4 @@
-use std::io::stdout;
+use std::{collections::HashMap, io::stdout};
 
 use crossterm::{
     cursor::{Hide, MoveDown, MoveLeft, MoveTo, Show},
@@ -74,8 +74,29 @@ pub fn print_in_view(
     Ok(())
 }
 
+fn add_row_to_cache(
+    block_id: &str,
+    x: i32,
+    y: i32,
+    width: i32,
+    placement_grid: &mut HashMap<(i32, i32), Vec<String>>,
+) {
+    for i in 0..width {
+        placement_grid
+            .entry((x + i, y))
+            .or_default()
+            .push(block_id.to_string())
+    }
+}
+
 /// returns either dx or dy depending on the block shape (expression or stack)
-pub fn draw_block(runtime: &Runtime, block_id: &str, x: i32, y: i32) -> ViiruResult<i32> {
+pub fn draw_block(
+    runtime: &Runtime,
+    block_id: &str,
+    x: i32,
+    y: i32,
+    placement_grid: &mut HashMap<(i32, i32), Vec<String>>,
+) -> ViiruResult<i32> {
     let block = &runtime.blocks[block_id];
     let spec = &BLOCKS[&block.opcode];
     let mut max_width = 0;
@@ -122,38 +143,46 @@ pub fn draw_block(runtime: &Runtime, block_id: &str, x: i32, y: i32) -> ViiruRes
     for line in &spec.lines {
         print_in_view(runtime, x, y + dy, delimeters.0, block_colors)?;
         let d_count = delimeters.0.chars().count();
+        add_row_to_cache(block_id, x, y + dy, d_count as i32, placement_grid);
         dx += d_count as i32;
         max_width = max_width.max(dx);
         for frag in line {
             match frag {
                 Fragment::Text(t) => {
                     print_in_view(runtime, x + dx, y + dy, t, block_colors)?;
-                    dx += t.chars().count() as i32;
+                    let d_count = t.chars().count() as i32;
+                    add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
+                    dx += d_count;
                     max_width = max_width.max(dx);
                 }
                 Fragment::StrumberInput(input_name, _default) => {
                     let Input {
                         shadow_id,
-                        block_id,
+                        block_id: child_id,
                     } = &block.inputs[input_name];
-                    let topmost = block_id.clone().or(shadow_id.clone());
+                    let topmost = child_id.clone().or(shadow_id.clone());
                     if let Some(input_id) = topmost {
-                        let delta = draw_block(runtime, &input_id, x + dx, y + dy)?;
+                        let delta = draw_block(runtime, &input_id, x + dx, y + dy, placement_grid)?;
+                        add_row_to_cache(block_id, x + dx, y + dy, delta, placement_grid);
                         dx += delta;
                         max_width = max_width.max(dx);
                     } else {
                         print_in_view(runtime, x + dx, y + dy, "()", alt_colors)?;
+                        add_row_to_cache(block_id, x + dx, y + dy, 2, placement_grid);
                         dx += 2;
                         max_width = max_width.max(dx);
                     }
                 }
                 Fragment::BooleanInput(input_name) => {
                     if let Some(child_id) = &block.inputs[input_name].block_id {
-                        let delta = draw_block(runtime, child_id, x + dx, y + dy)?;
+                        let delta = draw_block(runtime, child_id, x + dx, y + dy, placement_grid)?;
+                        add_row_to_cache(block_id, x + dx, y + dy, delta, placement_grid);
+
                         dx += delta;
                         max_width = max_width.max(dx);
                     } else {
                         print_in_view(runtime, x + dx, y + dy, "<>", alt_colors)?;
+                        add_row_to_cache(block_id, x + dx, y + dy, 2, placement_grid);
                         dx += 2;
                         max_width = max_width.max(dx);
                     }
@@ -161,9 +190,11 @@ pub fn draw_block(runtime: &Runtime, block_id: &str, x: i32, y: i32) -> ViiruRes
                 Fragment::BlockInput(input_name) => {
                     if let Some(child_id) = &block.inputs[input_name].block_id {
                         // - 1 because we already have 1 cell available
-                        let stack_height = draw_block(runtime, child_id, x + 1, y + dy)? - 1;
+                        let stack_height =
+                            draw_block(runtime, child_id, x + 1, y + dy, placement_grid)? - 1;
                         for y_range in 1..=stack_height {
                             print_in_view(runtime, x, y + dy + y_range, " ", block_colors)?;
+                            add_row_to_cache(block_id, x, y + dy + y_range, 1, placement_grid);
                         }
                         dy += stack_height;
                     }
@@ -172,7 +203,9 @@ pub fn draw_block(runtime: &Runtime, block_id: &str, x: i32, y: i32) -> ViiruRes
                 Fragment::Dropdown(field) => {
                     // todo: dropdowns are not implemented
                     print_in_view(runtime, x + dx, y + dy, &format!("[{field}]"), block_colors)?;
-                    dx += 2 + field.chars().count() as i32;
+                    let d_count = 2 + field.chars().count() as i32;
+                    add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
+                    dx += d_count;
                 }
                 Fragment::Expander => {
                     print_in_view(
@@ -183,6 +216,7 @@ pub fn draw_block(runtime: &Runtime, block_id: &str, x: i32, y: i32) -> ViiruRes
                         &" ".repeat(max_width as usize - 1),
                         block_colors,
                     )?;
+                    add_row_to_cache(block_id, x + dx, y + dy, max_width - 1, placement_grid);
                     skip_padding = true;
                     dx = max_width;
                 }
@@ -201,23 +235,28 @@ pub fn draw_block(runtime: &Runtime, block_id: &str, x: i32, y: i32) -> ViiruRes
                     );
                     // todo: ascii equivalent?
                     print_in_view(runtime, x + dx, y + dy, "▸", flag_color)?;
+                    add_row_to_cache(block_id, x + dx, y + dy, 1, placement_grid);
                     dx += 1;
                     max_width = max_width.max(dx);
                 }
                 Fragment::Clockwise => {
                     print_in_view(runtime, x + dx, y + dy, "↻", block_colors)?;
+                    add_row_to_cache(block_id, x + dx, y + dy, 1, placement_grid);
                     dx += 1;
                     max_width = max_width.max(dx);
                 }
                 Fragment::Anticlockwise => {
                     print_in_view(runtime, x + dx, y + dy, "↺", block_colors)?;
+                    add_row_to_cache(block_id, x + dx, y + dy, 1, placement_grid);
                     dx += 1;
                     max_width = max_width.max(dx);
                 }
                 Fragment::FieldText(field) => {
                     let Field { text, .. } = block.fields.get(field).unwrap();
                     print_in_view(runtime, x + dx, y + dy, text, block_colors)?;
-                    dx += text.chars().count() as i32;
+                    let d_count = text.chars().count() as i32;
+                    add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
+                    dx += d_count;
                     max_width = max_width.max(dx);
                 }
                 Fragment::CustomColour(field) => {
@@ -228,6 +267,7 @@ pub fn draw_block(runtime: &Runtime, block_id: &str, x: i32, y: i32) -> ViiruRes
                     let (r, g, b) = parse_rgb(&rgb_string[1..]);
                     let custom_colours = Colors::new(Color::Reset, Color::Rgb { r, g, b });
                     print_in_view(runtime, x + dx, y + dy, "  ", custom_colours)?;
+                    add_row_to_cache(block_id, x + dx, y + dy, 2, placement_grid);
                     dx += 2;
                     max_width = max_width.max(dx);
                 }
@@ -236,7 +276,9 @@ pub fn draw_block(runtime: &Runtime, block_id: &str, x: i32, y: i32) -> ViiruRes
         }
         if !skip_padding {
             print_in_view(runtime, x + dx, y + dy, delimeters.1, block_colors)?;
-            dx += delimeters.1.chars().count() as i32;
+            let d_count = delimeters.1.chars().count() as i32;
+            add_row_to_cache(block_id, x + dx, y + dy, d_count, placement_grid);
+            dx += d_count;
             max_width = max_width.max(dx);
         }
         skip_padding = false;
@@ -249,10 +291,11 @@ pub fn draw_block(runtime: &Runtime, block_id: &str, x: i32, y: i32) -> ViiruRes
 
     if spec.is_hat {
         print_in_view(runtime, x, y, &" ".repeat(max_width as usize), block_colors)?;
+        add_row_to_cache(block_id, x, y, max_width, placement_grid);
     }
 
     if let Some(next_id) = &block.next_id {
-        dy += draw_block(runtime, next_id, x, y + dy)?;
+        dy += draw_block(runtime, next_id, x, y + dy, placement_grid)?;
     }
     queue!(stdout(), ResetColor)?;
 
