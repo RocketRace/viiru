@@ -37,6 +37,7 @@ pub struct Runtime<'js, 'a> {
     api: Handle<'js, JsObject>,
     pub do_sync: bool,
     pub state: State,
+    is_dirty: bool,
     // ui
     pub viewport: Viewport,
     pub window_cols: u16,
@@ -80,6 +81,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             next_usable_id: 0,
             state: State::Move,
             do_sync: true,
+            is_dirty: false,
             // ui
             viewport: Viewport {
                 x_min: 0,
@@ -109,6 +111,10 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             lists: HashMap::new(),
             broadcasts: HashMap::new(),
         }
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        self.is_dirty
     }
 
     pub fn move_x(&mut self, dx: i32) -> NeonResult<()> {
@@ -199,6 +205,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
 
     pub fn save_project(&mut self, path: &str) -> NeonResult<()> {
         bridge::save_project(self.cx, self.api, path)?;
+        self.is_dirty = false;
         Ok(())
     }
 
@@ -271,6 +278,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         self.top_level.push(id.clone());
         // todo: perhaps we can let the vm generate the ID
         if self.do_sync {
+            self.is_dirty = true;
             bridge::create_block(self.cx, self.api, opcode, is_shadow, Some(&id))?;
         }
         Ok(id)
@@ -362,6 +370,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         self.delete_blocks_recursively(id);
         // The VM handles recursion.
         if self.do_sync {
+            self.is_dirty = true;
             bridge::delete_block(self.cx, self.api, id)?;
         }
         Ok(())
@@ -372,6 +381,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         block.x += dx;
         block.y += dy;
         if self.do_sync {
+            self.is_dirty = true;
             bridge::slide_block(self.cx, self.api, id, block.x, block.y)?;
         }
         for child in block.inputs.clone().values() {
@@ -421,6 +431,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         self.blocks.get_mut(id).unwrap().parent_id = Some(parent_id.to_string());
         self.remove_top_level(id);
         if self.do_sync {
+            self.is_dirty = true;
             bridge::attach_block(
                 self.cx,
                 self.api,
@@ -447,6 +458,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             todo!()
         }
         if self.do_sync {
+            self.is_dirty = true;
             bridge::attach_block(self.cx, self.api, id, parent_id, None, false)?;
         }
 
@@ -478,6 +490,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         self.blocks.get_mut(id).unwrap().parent_id = None;
         self.slide_block_to(id, new_x, new_y)?;
         if self.do_sync {
+            self.is_dirty = true;
             bridge::detach_block(self.cx, self.api, id)?;
         }
         Ok(())
@@ -498,6 +511,7 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             block.remove_field_id(field_name);
         }
         if self.do_sync {
+            self.is_dirty = true;
             bridge::change_field(self.cx, self.api, block_id, field_name, text, data_id)?;
         }
         Ok(())

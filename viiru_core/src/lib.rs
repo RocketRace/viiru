@@ -35,6 +35,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let mut runtime = Runtime::new(&mut cx, api);
 
     let result = in_terminal_scope(|| {
+        // todo: replace with a proper implementation of "new project"
         runtime.load_project("example/empty.sb3")?;
         execute!(stdout(), Clear(ClearType::All))?;
 
@@ -46,10 +47,6 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             runtime.toolbox.push(id);
         }
         runtime.do_sync = true;
-
-        let (add, _) = runtime.create_block_template("operator_add")?;
-        let (child, _) = runtime.create_block_template("operator_subtract")?;
-        runtime.attach_input(&child, &add, "NUM1", false)?;
 
         let viewport_offset_x = 3;
         let viewport_offset_y = 1;
@@ -135,8 +132,20 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                     if event.kind == KeyEventKind::Press {
                         match event.code {
                             KeyCode::Char('q') => {
-                                runtime.save_project("example/output.sb3")?;
+                                if runtime.is_dirty() {
+                                    // todo
+                                } else {
+                                    break;
+                                }
+                            }
+                            KeyCode::Char('Q') => {
                                 break;
+                            }
+                            KeyCode::Char('o') => {
+                                runtime.load_project("example/empty.sb3")?;
+                            }
+                            KeyCode::Char('w') => {
+                                runtime.save_project("example/output.sb3")?;
                             }
                             KeyCode::Char('h') => match runtime.state {
                                 State::Move | State::Hold => {
