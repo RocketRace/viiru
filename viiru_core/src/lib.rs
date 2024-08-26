@@ -255,7 +255,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                         {
                                             let selected = a.last().unwrap().clone();
                                             runtime.detach_block(&selected)?;
-                                            runtime.cursor_block = Some(selected.clone());
+                                            runtime.cursor_block = Some(selected);
                                             needs_refresh = true;
                                             runtime.state = State::Hold;
                                         }
@@ -264,6 +264,20 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                         // TODO: attach to drop-off points
                                         runtime.cursor_block.take().unwrap();
                                         runtime.state = State::Move;
+                                    }
+                                    State::Toolbox => {
+                                        let toolbox_id =
+                                            runtime.toolbox[runtime.toolbox_cursor].clone();
+                                        let spawned_id = runtime.duplicate_block(
+                                            &toolbox_id,
+                                            runtime.cursor_x,
+                                            runtime.cursor_y,
+                                            true,
+                                        )?;
+                                        runtime.detach_block(&spawned_id)?;
+                                        runtime.cursor_block = Some(spawned_id);
+                                        needs_refresh = true;
+                                        runtime.state = State::Hold;
                                     }
                                     _ => (),
                                 }
