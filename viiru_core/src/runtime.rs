@@ -46,7 +46,9 @@ pub struct Runtime<'js, 'a> {
     pub cursor_block: Option<String>,
     pub state: State,
     pub toolbox: Vec<String>,
-    pub toolbox_offset: usize,
+    pub toolbox_cursor: usize,
+    pub toolbox_scroll: usize,
+    pub toolbox_visible_max: usize,
     // data
     pub blocks: HashMap<String, Block>,
     pub top_level: Vec<String>,
@@ -55,7 +57,7 @@ pub struct Runtime<'js, 'a> {
     pub broadcasts: HashMap<String, String>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum State {
     Move,
     Hold,
@@ -87,7 +89,9 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
             state: State::Move,
             top_level: vec![],
             toolbox: vec![],
-            toolbox_offset: 0,
+            toolbox_cursor: 0,
+            toolbox_scroll: 0,
+            toolbox_visible_max: 0,
             blocks: HashMap::new(),
             variables: HashMap::new(),
             lists: HashMap::new(),

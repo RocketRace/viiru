@@ -106,7 +106,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                     Print(position)
                 )?;
 
-                draw_toolbox(&runtime, viewport_offset_x, viewport_offset_y)?;
+                draw_toolbox(&mut runtime, viewport_offset_x, viewport_offset_y, false)?;
 
                 stdout().flush()?;
                 needs_refresh = false;
@@ -141,15 +141,37 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                     }
                                     needs_refresh = true;
                                 }
+                                State::Toolbox => {
+                                    runtime.toolbox_cursor =
+                                        (runtime.toolbox_cursor + 1).min(runtime.toolbox.len() - 1);
+                                    while runtime.toolbox_cursor > runtime.toolbox_visible_max {
+                                        runtime.toolbox_scroll = (runtime.toolbox_scroll + 1)
+                                            .min(runtime.toolbox.len() - 1);
+                                        draw_toolbox(
+                                            &mut runtime,
+                                            viewport_offset_x,
+                                            viewport_offset_y,
+                                            true,
+                                        )?;
+                                    }
+                                    needs_refresh = true;
+                                }
                                 _ => (),
                             },
                             KeyCode::Char('k') => match runtime.state {
                                 State::Move | State::Hold => {
                                     runtime.move_y(-1)?;
-                                    if runtime.cursor_y - runtime.scroll_y
-                                        == runtime.viewport.y_min - 1
+                                    if runtime.cursor_y - runtime.scroll_y < runtime.viewport.y_min
                                     {
                                         runtime.scroll_y -= 1;
+                                    }
+                                    needs_refresh = true;
+                                }
+                                State::Toolbox => {
+                                    runtime.toolbox_cursor =
+                                        runtime.toolbox_cursor.saturating_sub(1);
+                                    if runtime.toolbox_cursor == runtime.toolbox_scroll - 1 {
+                                        runtime.toolbox_scroll = runtime.toolbox_cursor;
                                     }
                                     needs_refresh = true;
                                 }
@@ -180,6 +202,13 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                     runtime.move_y(1)?;
                                     needs_refresh = true;
                                 }
+                                State::Toolbox => {
+                                    runtime.toolbox_cursor =
+                                        (runtime.toolbox_cursor + 1).min(runtime.toolbox.len() - 1);
+                                    runtime.toolbox_scroll =
+                                        (runtime.toolbox_scroll + 1).min(runtime.toolbox.len() - 1);
+                                    needs_refresh = true;
+                                }
                                 _ => (),
                             },
                             KeyCode::Char('K') => match runtime.state {
@@ -188,12 +217,30 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                     runtime.move_y(-1)?;
                                     needs_refresh = true;
                                 }
+                                State::Toolbox => {
+                                    runtime.toolbox_cursor =
+                                        runtime.toolbox_cursor.saturating_sub(1);
+                                    runtime.toolbox_scroll =
+                                        runtime.toolbox_scroll.saturating_sub(1);
+                                    needs_refresh = true;
+                                }
                                 _ => (),
                             },
                             KeyCode::Char('L') => match runtime.state {
                                 State::Move | State::Hold => {
                                     runtime.scroll_x += 1;
                                     runtime.move_x(1)?;
+                                    needs_refresh = true;
+                                }
+                                _ => (),
+                            },
+                            KeyCode::Char('t') => match runtime.state {
+                                State::Move => {
+                                    runtime.state = State::Toolbox;
+                                    needs_refresh = true;
+                                }
+                                State::Toolbox => {
+                                    runtime.state = State::Move;
                                     needs_refresh = true;
                                 }
                                 _ => (),

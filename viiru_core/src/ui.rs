@@ -14,7 +14,7 @@ use crate::{
     block::{Field, Input},
     opcodes::BLOCKS,
     result::ViiruResult,
-    runtime::Runtime,
+    runtime::{Runtime, State},
     spec::{Fragment, Shape},
     util::parse_rgb,
 };
@@ -458,7 +458,13 @@ pub fn draw_marker_dots(runtime: &Runtime) -> ViiruResult<()> {
     Ok(())
 }
 
-pub fn draw_toolbox(runtime: &Runtime, left_border: i32, top_border: i32) -> ViiruResult<()> {
+pub fn draw_toolbox(
+    runtime: &mut Runtime,
+    left_border: i32,
+    top_border: i32,
+    // hack: replace this whole system with a proper toolbox viewport
+    recompute: bool,
+) -> ViiruResult<()> {
     // + 1 for border, + 1 for blank, + 1 for potential cursor, + 2 for numbers, + 1 for blank
     let offset_x = runtime.scroll_x + left_border + runtime.viewport.width() + 6;
     let offset_y = runtime.scroll_y + top_border;
@@ -468,28 +474,48 @@ pub fn draw_toolbox(runtime: &Runtime, left_border: i32, top_border: i32) -> Vii
         .toolbox
         .iter()
         .enumerate()
-        .skip(runtime.toolbox_offset)
+        .skip(runtime.toolbox_scroll)
     {
         let mut unused = HashMap::new();
         let shape = BLOCKS[&runtime.blocks[id].opcode].shape;
-        let i_str = i.to_string();
+        let i_str = if i == runtime.toolbox_cursor {
+            if runtime.state == State::Toolbox {
+                format!(">{i}")
+            } else {
+                format!("={i}")
+            }
+        } else {
+            i.to_string()
+        };
         let colors = Colors::new(Color::Reset, Color::Reset);
-        print_in_view(
+        if !recompute {
+            print_in_view(
+                runtime,
+                offset_x - 1 - i_str.len() as i32,
+                offset_y + dy,
+                &i_str,
+                colors,
+                true,
+            )?;
+        }
+        let delta = draw_block(
             runtime,
-            offset_x - 1 - i_str.len() as i32,
+            id,
+            offset_x,
             offset_y + dy,
-            &i_str,
-            colors,
-            true,
+            &mut unused,
+            !recompute,
         )?;
-        let delta = draw_block(runtime, id, offset_x, offset_y + dy, &mut unused, true)?;
-        queue!(stdout(), ResetColor)?;
+        if !recompute {
+            queue!(stdout(), ResetColor)?;
+        }
         if let Shape::Stack = shape {
             dy += delta;
         } else {
             dy += 1;
         }
         if dy >= runtime.viewport.height() {
+            runtime.toolbox_visible_max = i;
             break;
         }
     }
