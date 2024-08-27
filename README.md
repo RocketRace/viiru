@@ -27,7 +27,6 @@ Then, you can launch the editor: `npm run main`
 
 ## What's next
 
-* Optimize screen drawing routines
 * Clean up the toolbox, both in terms of implementation and usability. It is currently somewhat hacky 
   and inconvenient.
 * More placement options, e.g. snapping blocks above or in the middle a stack
@@ -35,6 +34,7 @@ Then, you can launch the editor: `npm run main`
 * Implement variable and list handling
 * Implement extensions (which includes pen blocks), as well as hidden blocks for compatibility
 * General code quality fixes all around (this has been a bit rushed)
+* Consider using a higher level library such as ratatui for UI
 * Implement custom blocks
 * Implement target switching, i.e. editing scripts of more than a single sprite (or the stage)
 * Implement static and dynamic dropdowns. This requires having access to multiple targets.
