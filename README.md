@@ -1,6 +1,6 @@
 # viiru - terminal editor for Scratch
 
-**Bringing the beloved and intuitive graphical programming language to a text-based and unnatural medium!**
+**Bringing the beloved graphical programming language for novices to an inaccessible text-based medium!**
 
 
 *(Terribly sorry for the flickering in advance!)*
