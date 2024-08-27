@@ -16,7 +16,7 @@ use crossterm::{
 };
 use neon::prelude::*;
 use runtime::{Runtime, State};
-use ui::{draw_toolbox, in_terminal_scope, refresh_screen};
+use ui::{in_terminal_scope, Screen};
 
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
@@ -40,10 +40,15 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
         let WindowSize { columns, rows, .. } = window_size()?;
 
+        let mut screen = Screen::new(columns, rows);
+
         runtime.set_viewport(columns, rows);
         runtime.initialize_scroll();
 
-        refresh_screen(&mut runtime)?;
+        screen.clear();
+        screen.refresh_screen(&mut runtime)?;
+        screen.flush_contents()?;
+        screen.draw_cursor(&runtime)?;
         let mut needs_refresh = false;
         loop {
             match read()? {
@@ -174,7 +179,7 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                                                 .min(runtime.toolbox.len() - 1);
                                             let vox = runtime.viewport_offset_x;
                                             let voy = runtime.viewport_offset_y;
-                                            draw_toolbox(&mut runtime, vox, voy, true)?;
+                                            screen.draw_toolbox(&mut runtime, vox, voy, true)?;
                                         }
                                         needs_refresh = true;
                                     }
@@ -404,13 +409,18 @@ fn tui_main(mut cx: FunctionContext) -> JsResult<JsUndefined> {
                 }
                 crossterm::event::Event::Resize(new_columns, new_rows) => {
                     runtime.set_viewport(new_columns, new_rows);
+                    screen.resize(new_columns, new_rows);
                     needs_refresh = true;
                 }
                 _ => (),
             }
             // TODO: implement some form of culling & per-component refresh
             if needs_refresh {
-                refresh_screen(&mut runtime)?;
+                screen.clear();
+                screen.refresh_screen(&mut runtime)?;
+                screen.flush_contents()?;
+                // cursor is always drawn last
+                screen.draw_cursor(&runtime)?;
                 needs_refresh = false;
             }
         }
