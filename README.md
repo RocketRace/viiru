@@ -36,6 +36,7 @@ Then, you can launch the editor: `npm run main`
 * More placement options, e.g. snapping blocks above or in the middle a stack
 * Implement variable and list handling
 * Implement extensions (which includes pen blocks), as well as hidden blocks for compatibility
+* General code quality fixes all around (this has been a bit rushed)
 * Implement custom blocks
 * Implement target switching, i.e. editing scripts of more than a single sprite (or the stage)
 * Implement static and dynamic dropdowns. This requires having access to multiple targets.
