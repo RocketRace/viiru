@@ -520,26 +520,30 @@ impl<'js, 'rt> Runtime<'js, 'rt> {
         let parent_id = self.blocks[id].parent_id.clone();
         if let Some(parent_id) = parent_id {
             let parent = self.blocks.get_mut(&parent_id).unwrap();
+            let mut removed = false;
             if let Some(next_id) = &parent.next_id {
                 if next_id == id {
                     parent.next_id = None;
+                    removed = true;
                 }
             }
-            let (input_name, is_shadow) = parent
-                .inputs
-                .iter()
-                .filter_map(|(input_name, input)| {
-                    if let Some(bid) = &input.block_id {
-                        (bid == id).then(|| (input_name.clone(), false))
-                    } else if let Some(bid) = &input.shadow_id {
-                        (bid == id).then(|| (input_name.clone(), true))
-                    } else {
-                        None
-                    }
-                })
-                .next()
-                .unwrap();
-            parent.remove_input(&input_name, is_shadow);
+            if !removed {
+                let (input_name, is_shadow) = parent
+                    .inputs
+                    .iter()
+                    .filter_map(|(input_name, input)| {
+                        if let Some(bid) = &input.block_id {
+                            (bid == id).then(|| (input_name.clone(), false))
+                        } else if let Some(bid) = &input.shadow_id {
+                            (bid == id).then(|| (input_name.clone(), true))
+                        } else {
+                            None
+                        }
+                    })
+                    .next()
+                    .unwrap();
+                parent.remove_input(&input_name, is_shadow);
+            }
             self.top_level.push(id.to_string());
         }
         self.blocks.get_mut(id).unwrap().parent_id = None;
