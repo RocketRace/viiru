@@ -2,10 +2,7 @@
 
 **Bringing the beloved graphical programming language for novices to an inaccessible text-based medium!**
 
-
-*(Terribly sorry for the flickering in advance!)*
-
-https://github.com/user-attachments/assets/c810f8cf-9e06-4060-a462-efefd5440122
+https://github.com/user-attachments/assets/eed2319e-5fa6-43f7-8895-1a5dfe74166e
 
 ## How to run
 
@@ -30,7 +27,7 @@ Then, you can launch the editor: `npm run main`
 
 ## What's next
 
-* Optimize screen drawing routines to minimize flashing
+* Optimize screen drawing routines
 * Clean up the toolbox, both in terms of implementation and usability. It is currently somewhat hacky 
   and inconvenient.
 * More placement options, e.g. snapping blocks above or in the middle a stack
