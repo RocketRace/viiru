@@ -1,0 +1,18 @@
+
+.----------------------------.
+define add (String) to Level 1
+if <(length of (String)) < (12)> then
+| add (join (String) (-)) to Level 1
+else
+| if <(length of (String)) > (12)> then
+| | set [Illegal string v] to (1)
+| else
+| | repeat (Level 1?)
+| | | add (String) to [Level 1 v]
+| | end
+| | repeat (Level 2?)
+| | | add (String) to [Level 2 v]
+| | end
+| end
+end
+
