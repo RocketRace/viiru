@@ -2,6 +2,8 @@
 
 **Bringing the beloved graphical programming language for novices to an inaccessible text-based medium!**
 
+Viiru is a TUI for the Scratch programming language.
+
 https://github.com/user-attachments/assets/eed2319e-5fa6-43f7-8895-1a5dfe74166e
 
 ## How to run
